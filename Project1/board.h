@@ -13,6 +13,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 /**
  * array-based board for 2048
@@ -24,6 +25,17 @@
  * (12) (13) (14) (15)
  *
  */
+std::vector<int> fibs(33, 0);
+int fib(int i){
+	if(fibs[i]!=0){
+		return fibs[i];
+	}
+	if(i==0&&i==1){
+		return fibs[i] = 1;
+	}
+	return fib(i-1)+fib(i-2);
+}
+
 class board {
 public:
 	typedef uint32_t cell;
