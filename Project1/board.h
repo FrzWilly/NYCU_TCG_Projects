@@ -29,7 +29,7 @@ int fib(int i){
 	if(fibs[i]!=0){
 		return fibs[i];
 	}
-	return fib(i-1)+fib(i-2);
+	return fibs[i] = fib(i-1)+fib(i-2);
 }
 
 class board {
