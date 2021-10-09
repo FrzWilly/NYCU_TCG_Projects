@@ -17,6 +17,8 @@
 #include "board.h"
 #include "action.h"
 #include <fstream>
+#include <utility>
+#include <vector>
 
 class agent {
 public:
@@ -120,12 +122,29 @@ public:
 		opcode({ 0, 1, 2, 3 }) {}
 
 	virtual action take_action(const board& before) {
+		//shuffle so that if multiple actions share same value then randomly choose one
 		std::shuffle(opcode.begin(), opcode.end(), engine);
-		for (int op : opcode) {
-			board::reward reward = board(before).slide(op);
-			if (reward != -1) return action::slide(op);
+		std::pair<int, board::reward> best_move(-1, -1);
+		// performs two-layer greedy search
+		for (int op1 : opcode) {
+			//board::reward reward_temp = 0;
+			board::board board_1 = before;
+			board::reward reward = board(board_1).slide(op1);
+			if (reward == -1) continue;
+			//reward_temp += reward;
+			for (int op2 : opcode) {
+				board::board board_2 = board_1;
+				reward += board(board_2).slide(op2);
+				if(reward > best_move.second){
+					best_move = std::make_pair(op1, reward);
+				}
+				//if (reward != -1) return action::slide(op);
+			}
 		}
-		return action();
+		if(best_move.first >= 0)
+			return action::slide(best_move.first);
+		else
+			return action();
 	}
 
 private:
