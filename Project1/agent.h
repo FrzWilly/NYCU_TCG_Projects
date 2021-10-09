@@ -113,3 +113,21 @@ public:
 private:
 	std::array<int, 4> opcode;
 };
+
+class heuristic_player : public random_agent {
+public:
+	heuristic_player(const std::string& args = "") : random_agent("name=dummy role=player " + args),
+		opcode({ 0, 1, 2, 3 }) {}
+
+	virtual action take_action(const board& before) {
+		std::shuffle(opcode.begin(), opcode.end(), engine);
+		for (int op : opcode) {
+			board::reward reward = board(before).slide(op);
+			if (reward != -1) return action::slide(op);
+		}
+		return action();
+	}
+
+private:
+	std::array<int, 4> opcode;
+};
