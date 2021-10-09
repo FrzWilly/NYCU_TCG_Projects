@@ -125,7 +125,7 @@ public:
 		//shuffle so that if multiple actions share same value then randomly choose one
 		std::shuffle(opcode.begin(), opcode.end(), engine);
 		std::pair<int, board::reward> best_move(-1, -1);
-		std::vector<std::pair<int, board::reward> > record;
+		//std::vector<std::pair<int, board::reward> > record;
 		// performs two-layer greedy search
 		for (int op1 : opcode) {
 			//board::reward reward_temp = 0;
@@ -134,9 +134,8 @@ public:
 			if (reward == -1) continue;
 			//reward_temp += reward;
 			for (int op2 : opcode) {
-				board board_2 = board(board_1);
-				reward += board_2.slide(op2);
-				record.push_back(std::make_pair(op1, reward));
+				reward += std::max(0, board(board_1).slide(op2));
+				//record.push_back(std::make_pair(op1, reward));
 				if(reward > best_move.second){
 					best_move = std::make_pair(op1, reward);
 				}
@@ -149,7 +148,7 @@ public:
 		else{
 			//for(auto mv : record)
 				//printf("%d %d", mv.first, mv.second);
-			//std::cout<<before<<std::endl;
+			std::cout<<before<<std::endl;
 			return action();
 		}
 	}
