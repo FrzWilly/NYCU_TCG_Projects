@@ -128,12 +128,12 @@ public:
 		// performs two-layer greedy search
 		for (int op1 : opcode) {
 			//board::reward reward_temp = 0;
-			board::board board_1 = before;
+			board board_1 = before;
 			board::reward reward = board(board_1).slide(op1);
 			if (reward == -1) continue;
 			//reward_temp += reward;
 			for (int op2 : opcode) {
-				board::board board_2 = board_1;
+				board board_2 = board_1;
 				reward += board(board_2).slide(op2);
 				if(reward > best_move.second){
 					best_move = std::make_pair(op1, reward);
