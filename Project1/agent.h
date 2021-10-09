@@ -148,7 +148,7 @@ public:
 		else{
 			//for(auto mv : record)
 				//printf("%d %d", mv.first, mv.second);
-			std::cout<<before<<std::endl;
+			//std::cout<<before<<std::endl;
 			return action();
 		}
 	}
