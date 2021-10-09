@@ -126,35 +126,28 @@ public:
 		std::shuffle(opcode.begin(), opcode.end(), engine);
 		std::pair<int, board::reward> best_move(-1, -1);
 		rndenv env;
-		//std::vector<std::pair<int, board::reward> > record;
 		// performs two-layer greedy search
 		for (int op1 : opcode) {
-			//board::reward reward_temp = 0;
 			board board_1 = board(before);
 			board::reward reward = board_1.slide(op1);
 			if (reward == -1) continue;
-			//reward_temp += reward;
+			
 			for (int op2 : opcode) {
 				board board_2 = board(board_1);
-				action::place plc = env.take_action(board(board_1));
-				board_2.place(plc.position(), plc.tile());
+				action::place plc = env.take_action(board_2);
+				plc.apply(board_2);
+
 				reward += std::max(0, board_2.slide(op2));
-				//record.push_back(std::make_pair(op1, reward));
 				if(reward > best_move.second){
 					best_move = std::make_pair(op1, reward);
 				}
-				//if (reward != -1) return action::slide(op);
 			}
 		}
-		//printf("%d", best_move.first);
+
 		if(best_move.first >= 0)
 			return action::slide(best_move.first);
-		else{
-			//for(auto mv : record)
-				//printf("%d %d", mv.first, mv.second);
-			//std::cout<<before<<std::endl;
+		else
 			return action();
-		}
 	}
 
 private:
