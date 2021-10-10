@@ -138,7 +138,7 @@ public:
 			action::place plc = env.take_action(board_1);
 			plc.apply(board_1);
 			for (int op2 : opcode) {
-				reward += std::max(0, board(board_1).slide(op2));
+				reward += std::max(0, board_1.slide(op2));
 				if(reward > best_move.second){
 					best_move = std::make_pair(op1, reward);
 				}
