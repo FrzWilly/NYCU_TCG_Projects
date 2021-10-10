@@ -131,13 +131,14 @@ public:
 			board board_1 = board(before);
 			board::reward reward = board_1.slide(op1);
 			if (reward == -1) continue;
+			action::slide(op1).apply(board_1);
 
 			//randomly pop new tile (only search one branch)
-			board board_2 = board(board_1);
-			action::place plc = env.take_action(board_2);
-			plc.apply(board_2);
+			//board board_2 = board(board_1);
+			action::place plc = env.take_action(board_1);
+			plc.apply(board_1);
 			for (int op2 : opcode) {
-				reward += std::max(0, board_2.slide(op2));
+				reward += std::max(0, board_1.slide(op2));
 				if(reward > best_move.second){
 					best_move = std::make_pair(op1, reward);
 				}
