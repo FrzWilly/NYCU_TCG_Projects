@@ -182,7 +182,7 @@ public:
 		out << "+------------------------+" << std::endl;
 		for (auto& row : b.tile) {
 			out << "|" << std::dec;
-			for (auto t : row) out << std::setw(6) << fib(t);
+			for (auto t : row) out << std::setw(6) << (t == 0 ? t : fib(t));
 			out << "|" << std::endl;
 		}
 		out << "+------------------------+" << std::endl;
