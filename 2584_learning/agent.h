@@ -16,9 +16,8 @@
 #include <algorithm>
 #include "board.h"
 #include "action.h"
+#include "weight.h"
 #include <fstream>
-#include <utility>
-#include <vector>
 
 class agent {
 public:
@@ -69,6 +68,52 @@ protected:
 };
 
 /**
+ * base agent for agents with weight tables and a learning rate
+ */
+class weight_agent : public agent {
+public:
+	weight_agent(const std::string& args = "") : agent(args), alpha(0) {
+		if (meta.find("init") != meta.end())
+			init_weights(meta["init"]);
+		if (meta.find("load") != meta.end())
+			load_weights(meta["load"]);
+		if (meta.find("alpha") != meta.end())
+			alpha = float(meta["alpha"]);
+	}
+	virtual ~weight_agent() {
+		if (meta.find("save") != meta.end())
+			save_weights(meta["save"]);
+	}
+
+protected:
+	virtual void init_weights(const std::string& info) {
+//		net.emplace_back(65536); // create an empty weight table with size 65536
+//		net.emplace_back(65536); // create an empty weight table with size 65536
+	}
+	virtual void load_weights(const std::string& path) {
+		std::ifstream in(path, std::ios::in | std::ios::binary);
+		if (!in.is_open()) std::exit(-1);
+		uint32_t size;
+		in.read(reinterpret_cast<char*>(&size), sizeof(size));
+		net.resize(size);
+		for (weight& w : net) in >> w;
+		in.close();
+	}
+	virtual void save_weights(const std::string& path) {
+		std::ofstream out(path, std::ios::out | std::ios::binary | std::ios::trunc);
+		if (!out.is_open()) std::exit(-1);
+		uint32_t size = net.size();
+		out.write(reinterpret_cast<char*>(&size), sizeof(size));
+		for (weight& w : net) out << w;
+		out.close();
+	}
+
+protected:
+	std::vector<weight> net;
+	float alpha;
+};
+
+/**
  * random environment
  * add a new random tile to an empty cell
  * 2-tile: 90%
@@ -110,45 +155,6 @@ public:
 			if (reward != -1) return action::slide(op);
 		}
 		return action();
-	}
-
-private:
-	std::array<int, 4> opcode;
-};
-
-class heuristic_player : public random_agent {
-public:
-	heuristic_player(const std::string& args = "") : random_agent("name=heuristic role=player " + args),
-		opcode({ 0, 1, 2, 3 }) {}
-
-	virtual action take_action(const board& before) {
-		//shuffle so that if multiple actions share same value then randomly choose one
-		std::shuffle(opcode.begin(), opcode.end(), engine);
-		std::pair<int, board::reward> best_move(-1, -1);
-		rndenv env;
-		// performs two-layer greedy search
-		for (int op1 : opcode) {
-			board board_1 = board(before);
-			board::reward reward = board_1.slide(op1);
-			if (reward == -1) continue;
-			//action::slide(op1).apply(board_1);
-
-			//randomly pop new tile (only search one branch)
-			//board board_2 = board(board_1);
-			action::place plc = env.take_action(board_1);
-			plc.apply(board_1);
-			for (int op2 : opcode) {
-				reward += std::max(0, board_1.slide(op2));
-				if(reward > best_move.second){
-					best_move = std::make_pair(op1, reward);
-				}
-			}
-		}
-
-		if(best_move.first >= 0)
-			return action::slide(best_move.first);
-		else
-			return action();
 	}
 
 private:
