@@ -24,14 +24,6 @@
  * (12) (13) (14) (15)
  *
  */
-std::array<int, 33> fibs = {1, 1};
-int fib(int i){
-	if(fibs[i]!=0){
-		return fibs[i];
-	}
-	return fibs[i] = fib(i-1)+fib(i-2);
-}
-
 class board {
 public:
 	typedef uint32_t cell;
@@ -102,10 +94,9 @@ public:
 				if (tile == 0) continue;
 				row[c] = 0;
 				if (hold) {
-					if ((std::abs(tile - hold) == 1) || (tile == 1 && hold == 1)) {
-						tile = std::max(tile, hold) + 1;
-						row[top++] = tile;
-						score += fib(tile);
+					if (tile == hold) {
+						row[top++] = ++tile;
+						score += (1 << tile);
 						hold = 0;
 					} else {
 						row[top++] = hold;
@@ -182,7 +173,7 @@ public:
 		out << "+------------------------+" << std::endl;
 		for (auto& row : b.tile) {
 			out << "|" << std::dec;
-			for (auto t : row) out << std::setw(6) << (t == 0 ? t : fib(t));
+			for (auto t : row) out << std::setw(6) << ((1 << t) & -2u);
 			out << "|" << std::endl;
 		}
 		out << "+------------------------+" << std::endl;

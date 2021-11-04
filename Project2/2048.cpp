@@ -18,7 +18,7 @@
 #include "statistic.h"
 
 int main(int argc, const char* argv[]) {
-	std::cout << "2584-Project: ";
+	std::cout << "2048-Demo: ";
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl << std::endl;
 
@@ -56,7 +56,7 @@ int main(int argc, const char* argv[]) {
 		summary |= stat.is_finished();
 	}
 
-	heuristic_player play(play_args);
+	player play(play_args);
 	rndenv evil(evil_args);
 
 	while (!stat.is_finished()) {
