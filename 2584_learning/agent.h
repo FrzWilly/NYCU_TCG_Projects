@@ -18,6 +18,8 @@
 #include "action.h"
 #include "weight.h"
 #include <fstream>
+#include <utility>
+#include <vector>
 
 class agent {
 public:
@@ -155,6 +157,45 @@ public:
 			if (reward != -1) return action::slide(op);
 		}
 		return action();
+	}
+
+private:
+	std::array<int, 4> opcode;
+};
+
+class heuristic_player : public random_agent {
+public:
+	heuristic_player(const std::string& args = "") : random_agent("name=heuristic role=player " + args),
+		opcode({ 0, 1, 2, 3 }) {}
+
+	virtual action take_action(const board& before) {
+		//shuffle so that if multiple actions share same value then randomly choose one
+		std::shuffle(opcode.begin(), opcode.end(), engine);
+		std::pair<int, board::reward> best_move(-1, -1);
+		rndenv env;
+		// performs two-layer greedy search
+		for (int op1 : opcode) {
+			board board_1 = board(before);
+			board::reward reward = board_1.slide(op1);
+			if (reward == -1) continue;
+			//action::slide(op1).apply(board_1);
+
+			//randomly pop new tile (only search one branch)
+			//board board_2 = board(board_1);
+			action::place plc = env.take_action(board_1);
+			plc.apply(board_1);
+			for (int op2 : opcode) {
+				reward += std::max(0, board_1.slide(op2));
+				if(reward > best_move.second){
+					best_move = std::make_pair(op1, reward);
+				}
+			}
+		}
+
+		if(best_move.first >= 0)
+			return action::slide(best_move.first);
+		else
+			return action();
 	}
 
 private:
