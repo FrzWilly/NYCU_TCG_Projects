@@ -80,7 +80,7 @@ std::vector<step> trajectory;
  */
 class weight_agent : public agent {
 public:
-	weight_agent(const std::string& args = "") : agent(args), alpha(0) {
+	weight_agent(const std::string& args = "") : agent("name=TD-Learning role=player " + args), alpha(0) {
 		if (meta.find("init") != meta.end())
 			init_weights(meta["init"]);
 		if (meta.find("load") != meta.end())
@@ -131,8 +131,8 @@ public:
 	virtual void close_episode(const std::string& flag = "") {
 		if(trajectory.empty()) return;
 		if(alpha == 0) return;
-		adjust_weight(trajectory[trajectory.size()].after, 0);
-		for(int i = trajectory.size();i>=0;i--){
+		adjust_weight(trajectory[trajectory.size()-1].after, 0);
+		for(int i = trajectory.size()-2;i>=0;i--){
 			adjust_weight(trajectory[i].after, 
 				trajectory[i+1].reward + estimate_value(trajectory[i+1].after));
 		}
@@ -189,7 +189,7 @@ protected:
 		}
 
 		if(best_op != -1){
-			trajectory.push_back({best_op, best_after});
+			trajectory.push_back({best_reward, best_after});
 		}
 
 		return action::slide(best_op);
