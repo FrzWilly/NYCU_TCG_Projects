@@ -125,6 +125,19 @@ public:
 		net[7][extract_feature(after, 3, 7, 11, 15)] += adjust;
 	}
 
+	virtual void open_episode(const std::string& flag = "") {
+		trajectory.clear();
+	}
+	virtual void close_episode(const std::string& flag = "") {
+		if(trajectory.empty()) return;
+		if(alpha == 0) return;
+		adjust_weight(trajectory[trajectory.size()].after, 0);
+		for(int i = trajectory.size();i>=0;i--){
+			adjust_weight(trajectory[i].after, 
+				trajectory[i+1].reward + estimate_value(trajectory[i+1].after));
+		}
+	}
+
 protected:
 	virtual void init_weights(const std::string& info) {
 //		net.emplace_back(65536); // create an empty weight table with size 65536
@@ -180,19 +193,6 @@ protected:
 		}
 
 		return action::slide(best_op);
-	}
-
-	virtual void open_episode(const std::string& flag = "") {
-		trajectory.clear();
-	}
-	virtual void close_episode(const std::string& flag = "") {
-		if(trajectory.empty()) return;
-		if(alpha == 0) return;
-		adjust_weight(trajectory[trajectory.size()].after, 0);
-		for(int i = trajectory.size();i>=0;i--){
-			adjust_weight(trajectory[i].after, 
-				trajectory[i+1].reward + estimate_value(trajectory[i+1].after));
-		}
 	}
 
 protected:
