@@ -69,6 +69,12 @@ protected:
 	std::default_random_engine engine;
 };
 
+struct step{
+	int reward;
+	board after;
+};
+
+std::vector<step> trajectory;
 /**
  * base agent for agents with weight tables and a learning rate
  */
@@ -94,6 +100,29 @@ public:
 	float estimate_value(const board& after) const {
 		float value = 0;
 		value += net[0][extract_feature(after, 0, 1, 2, 3)];
+		value += net[1][extract_feature(after, 4, 5, 6, 7)];
+		value += net[2][extract_feature(after, 8, 9, 10, 11)];
+		value += net[3][extract_feature(after, 12, 13, 14, 15)];
+		value += net[4][extract_feature(after, 0, 4, 8, 12)];
+		value += net[5][extract_feature(after, 1, 5, 9, 13)];
+		value += net[6][extract_feature(after, 2, 6, 10, 14)];
+		value += net[7][extract_feature(after, 3, 7, 11, 15)];
+
+		return value;
+	}
+
+	void adjust_weight(const board& after, float target){
+		float current = estimate_value(after);
+		float err = target - current;
+		float adjust = alpha * err;
+		net[0][extract_feature(after, 0, 1, 2, 3)] += adjust;
+		net[1][extract_feature(after, 4, 5, 6, 7)] += adjust;
+		net[2][extract_feature(after, 8, 9, 10, 11)] += adjust;
+		net[3][extract_feature(after, 12, 13, 14, 15)] += adjust;
+		net[4][extract_feature(after, 0, 4, 8, 12)] += adjust;
+		net[5][extract_feature(after, 1, 5, 9, 13)] += adjust;
+		net[6][extract_feature(after, 2, 6, 10, 14)] += adjust;
+		net[7][extract_feature(after, 3, 7, 11, 15)] += adjust;
 	}
 
 protected:
@@ -125,6 +154,45 @@ protected:
 		out.write(reinterpret_cast<char*>(&size), sizeof(size));
 		for (weight& w : net) out << w;
 		out.close();
+	}
+
+	virtual action take_action(const board& before) {
+		int best_op = -1;
+		int best_reward = -1;
+		float best_value = -1000000;
+		board best_after;
+		for(int op : {0, 1, 2, 3}){
+			board after = before;
+			int reward = after.slide(op);
+			if(reward == -1) continue;
+
+			float value = estimate_value(after);
+			if(reward + value > best_reward + best_value){
+				best_op = op;
+				best_reward = reward;
+				best_value = value;
+				best_after = after;
+			}
+		}
+
+		if(best_op != -1){
+			trajectory.push_back({best_op, best_after});
+		}
+
+		return action::slide(best_op);
+	}
+
+	virtual void open_episode(const std::string& flag = "") {
+		trajectory.clear();
+	}
+	virtual void close_episode(const std::string& flag = "") {
+		if(trajectory.empty()) return;
+		if(alpha == 0) return;
+		adjust_weight(trajectory[trajectory.size()].after, 0);
+		for(int i = trajectory.size();i>=0;i--){
+			adjust_weight(trajectory[i].after, 
+				trajectory[i+1].reward + estimate_value(trajectory[i+1].after));
+		}
 	}
 
 protected:
