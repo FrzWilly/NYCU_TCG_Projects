@@ -87,10 +87,27 @@ public:
 			save_weights(meta["save"]);
 	}
 
+	int extract_feature(const board& after, int a, int b, int c, int d) const{
+		return after(a) * 25 * 25 * 25 + after(b) * 25 * 25 + after(c) * 25 + after(d);
+	}
+
+	float estimate_value(const board& after) const {
+		float value = 0;
+		value += net[0][extract_feature(after, 0, 1, 2, 3)];
+	}
+
 protected:
 	virtual void init_weights(const std::string& info) {
 //		net.emplace_back(65536); // create an empty weight table with size 65536
 //		net.emplace_back(65536); // create an empty weight table with size 65536
+		net.emplace_back(25 * 25 * 25 * 25); 
+		net.emplace_back(25 * 25 * 25 * 25); 
+		net.emplace_back(25 * 25 * 25 * 25); 
+		net.emplace_back(25 * 25 * 25 * 25); 
+		net.emplace_back(25 * 25 * 25 * 25); 
+		net.emplace_back(25 * 25 * 25 * 25); 
+		net.emplace_back(25 * 25 * 25 * 25); 
+		net.emplace_back(25 * 25 * 25 * 25); 
 	}
 	virtual void load_weights(const std::string& path) {
 		std::ifstream in(path, std::ios::in | std::ios::binary);
