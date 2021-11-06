@@ -132,8 +132,8 @@ public:
 		net[2][extract_feature(after, 3, 7, 11, 15)] += adjust;
 		net[4][extract_feature_5(after, 8, 4, 0, 1, 2)] += adjust;
 		net[4][extract_feature_5(after, 1, 2, 3, 7, 11)] += adjust;
-		net[4][extract_feature_5(after, 7, 11, 13, 14, 15)] += adjust;
-		net[4][extract_feature_5(after, 4, 8, 12, 13, 14)] += adjust;
+		net[4][extract_feature_5(after, 7, 11, 15, 14, 13)] += adjust;
+		net[4][extract_feature_5(after, 14, 13, 12, 8, 4)] += adjust;
 	}
 
 	virtual void open_episode(const std::string& flag = "") {
