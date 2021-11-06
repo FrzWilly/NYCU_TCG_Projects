@@ -113,7 +113,11 @@ public:
 		value += net[4][extract_feature_5(after, 8, 4, 0, 1, 2)];
 		value += net[4][extract_feature_5(after, 1, 2, 3, 7, 11)];
 		value += net[4][extract_feature_5(after, 7, 11, 13, 14, 15)];
-		value += net[4][extract_feature_5(after, 4, 8, 12, 13, 14)];
+		value += net[4][extract_feature_5(after, 14, 13, 12, 8, 4)];
+		value += net[5][extract_feature_5(after, 1, 4, 5, 6, 9)];
+		value += net[5][extract_feature_5(after, 2, 5, 6, 7, 10)];
+		value += net[5][extract_feature_5(after, 5, 8, 9, 10, 13)];
+		value += net[5][extract_feature_5(after, 6, 9, 10, 11, 14)];
 
 		return value;
 	}
@@ -133,7 +137,12 @@ public:
 		net[4][extract_feature_5(after, 8, 4, 0, 1, 2)] += adjust;
 		net[4][extract_feature_5(after, 1, 2, 3, 7, 11)] += adjust;
 		net[4][extract_feature_5(after, 7, 11, 13, 14, 15)] += adjust;
-		net[4][extract_feature_5(after, 4, 8, 12, 13, 14)] += adjust;
+		net[4][extract_feature_5(after, 14, 13, 12, 8, 4)] += adjust;
+		net[5][extract_feature_5(after, 1, 4, 5, 6, 9)] += adjust;
+		net[5][extract_feature_5(after, 2, 5, 6, 7, 10)] += adjust;
+		net[5][extract_feature_5(after, 5, 8, 9, 10, 13)] += adjust;
+		net[5][extract_feature_5(after, 6, 9, 10, 11, 14)] += adjust;
+
 	}
 
 	virtual void open_episode(const std::string& flag = "") {
@@ -157,6 +166,7 @@ protected:
 		net.emplace_back(25 * 25 * 25 * 25); 
 		net.emplace_back(25 * 25 * 25 * 25); 
 		net.emplace_back(25 * 25 * 25 * 25); 
+		net.emplace_back(25 * 25 * 25 * 25 * 25); 
 		net.emplace_back(25 * 25 * 25 * 25 * 25); 
 		// net.emplace_back(25 * 25 * 25 * 25); 
 		// net.emplace_back(25 * 25 * 25 * 25); 
