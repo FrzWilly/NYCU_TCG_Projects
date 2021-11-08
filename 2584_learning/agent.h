@@ -99,6 +99,9 @@ public:
 	int extract_feature_5(const board& after, int a, int b, int c, int d, int e) const{
 		return after(a) * 25 * 25 * 25 * 25 + after(b) * 25 * 25 * 25 + after(c) * 25 * 25 + after(d) * 25 + after(e);
 	}
+	int extract_feature_6(const board& after, int a, int b, int c, int d, int e, int f) const{
+		return after(a) * 25 * 25 * 25 * 25 * 25 + after(b) * 25 * 25 * 25 * 25 + after(c) * 25 * 25 * 25 + after(d) * 25 * 25 + after(e) * 25 + after(f);
+	}
 
 	float estimate_value(const board& after) const {
 		float value = 0;
@@ -118,6 +121,14 @@ public:
 		value += net[5][extract_feature_5(after, 2, 5, 6, 7, 10)];
 		value += net[5][extract_feature_5(after, 5, 8, 9, 10, 13)];
 		value += net[5][extract_feature_5(after, 6, 9, 10, 11, 14)];
+		value += net[6][extract_feature_6(after, 0, 1, 2, 3, 4, 5)];
+		value += net[6][extract_feature_6(after, 0, 1, 2, 3, 6, 7)];
+		value += net[6][extract_feature_6(after, 8, 9, 12, 13, 14, 15)];
+		value += net[6][extract_feature_6(after, 10, 11, 12, 13, 14, 15)];
+		value += net[6][extract_feature_6(after, 0, 4, 8, 9, 12, 13)];
+		value += net[6][extract_feature_6(after, 0, 1, 4, 5, 8, 12)];
+		value += net[6][extract_feature_6(after, 3, 7, 10, 11, 14, 15)];
+		value += net[6][extract_feature_6(after, 2, 3, 6, 7, 11, 15)];
 
 		return value;
 	}
@@ -142,6 +153,14 @@ public:
 		net[5][extract_feature_5(after, 2, 5, 6, 7, 10)] += adjust;
 		net[5][extract_feature_5(after, 5, 8, 9, 10, 13)] += adjust;
 		net[5][extract_feature_5(after, 6, 9, 10, 11, 14)] += adjust;
+		net[6][extract_feature_6(after, 0, 1, 2, 3, 4, 5)] += adjust;
+		net[6][extract_feature_6(after, 0, 1, 2, 3, 6, 7)] += adjust;
+		net[6][extract_feature_6(after, 8, 9, 12, 13, 14, 15)] += adjust;
+		net[6][extract_feature_6(after, 10, 11, 12, 13, 14, 15)] += adjust;
+		net[6][extract_feature_6(after, 0, 4, 8, 9, 12, 13)] += adjust;
+		net[6][extract_feature_6(after, 0, 1, 4, 5, 8, 12)] += adjust;
+		net[6][extract_feature_6(after, 3, 7, 10, 11, 14, 15)] += adjust;
+		net[6][extract_feature_6(after, 2, 3, 6, 7, 11, 15)] += adjust;
 	}
 
 	virtual void open_episode(const std::string& flag = "") {
@@ -166,7 +185,8 @@ protected:
 		net.emplace_back(25 * 25 * 25 * 25); 
 		net.emplace_back(25 * 25 * 25 * 25); 
 		net.emplace_back(25 * 25 * 25 * 25 * 25); 
-		net.emplace_back(25 * 25 * 25 * 25 * 25); 
+		net.emplace_back(25 * 25 * 25 * 25 * 25);
+		net.emplace_back(25 * 25 * 25 * 25 * 25 * 25);
 		// net.emplace_back(25 * 25 * 25 * 25); 
 		// net.emplace_back(25 * 25 * 25 * 25); 
 		// net.emplace_back(25 * 25 * 25 * 25); 
