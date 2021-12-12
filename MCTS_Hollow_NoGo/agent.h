@@ -17,6 +17,7 @@
 #include "board.h"
 #include "action.h"
 #include <fstream>
+#include <memory>
 // UCB exploration ratio
 #define C 1.44
 //initial winrate of a unexpanded node in a Monte-Carlo tree
@@ -109,8 +110,8 @@ private:
 class MCTS_player : public random_agent {
 public:
 	MCTS_player(const std::string& args = "") : random_agent("name=random role=unknown " + args),
-		space(board::size_x * board::size_y), who(board::empty),
-		oppo_space(board::size_x * board::size_y), oppo(board::empty) {
+		space(board::size_x * board::size_y), oppo_space(board::size_x * board::size_y), 
+		who(board::empty), oppo(board::empty), MCT(tree_node(who)){
 		if (name().find_first_of("[]():; ") != std::string::npos)
 			throw std::invalid_argument("invalid name: " + name());
 		if (role() == "black") {
@@ -127,32 +128,46 @@ public:
 			space[i] = action::place(i, who);
 		for (size_t i = 0; i < oppo_space.size(); i++)
 			oppo_space[i] = action::place(i, oppo);
+
+		MCT = tree(tree_node(who));
 	}
 
-	class tree_node{
+	class tree_node
+	: public std::enable_shared_from_this<tree_node>
+	{
 	public:
-		tree_node(board::piece_type role, action::place move) :
-			role(role), move(move){
+		tree_node(board::piece_type role, action::place mv) :
+			role(role), move(mv){
 				winrate = INIT_WINRATE;
 				visit_count = 0;
 			}
 		// constructor used for initializing root
 		tree_node(board::piece_type role) :
-			role(role), move(move){
+			role(role), move(action()){
 				winrate = INIT_WINRATE;
 				visit_count = 0;
+		}
+
+		// tree_node(tree_node& node) :
+		// 	role(node.role), move(node.move){
+		// 		winrate = node.winrate;
+		// 		visit_count = node.visit_count;
+		// }
+
+		std::shared_ptr<tree_node> get_ptr(){
+			return shared_from_this();
 		}
 
 		bool has_child(action::place move){
 			return children.count(move);
 		}
 
-		tree_node& child(action::place move){
-			return children[move];
+		std::shared_ptr<tree_node> child(action::place& move){
+			return children[move]->get_ptr();
 		}
 
 		void new_child(board::piece_type role, action::place move){
-			tree_node new_node(role, move);
+			auto new_node = std::make_shared<tree_node>(role, move);
 			children[move] = new_node;
 		}
 
@@ -165,15 +180,15 @@ public:
 		}
 
 		int UCB_score(action::place move){
-			int c_winrate, c_vcount;
+			double c_winrate, c_vcount;
 			if(has_child(move)){
-				tree_node* chld = &children[move];
+				std::shared_ptr<tree_node> chld = children[move]->get_ptr();
 				c_winrate = chld->winrate;
 				c_vcount = chld->visit_count;
 			}
 			else{
 				c_winrate = INIT_WINRATE;
-				c_vcount = 1;
+				c_vcount = 0.1;
 			}
 			return c_winrate + C * sqrt(log(visit_count)/c_vcount);
 		}
@@ -184,7 +199,7 @@ public:
 		action::place move;
 		double winrate;
 		int visit_count;
-		std::map<action::place, MCTS_player::tree_node> children;
+		std::map<action::place, std::shared_ptr<MCTS_player::tree_node> > children;
 		tree_node* prev;
 	};
 
@@ -214,34 +229,37 @@ public:
 		}
 	}
 
-	virtual action selection(const board& state, tree_node& node) {
+	virtual action selection(const board& state, std::shared_ptr<tree_node> node) {
 		std::shuffle(space.begin(), space.end(), engine);
-		action::place* best_move;
+		action::place* best_move = nullptr;
 		int best_score = -999999;
 		board best_after;
-		for (const action::place& move : space) {
+		auto auto_space = space;
+		if(node->get_role() == oppo)
+			auto_space = oppo_space;
+		for (const action::place& move : auto_space) {
 			board after = state;
 			int score;
 			if (move.apply(after) == board::legal){
-				if(node.get_role() == who)
-					score = node.UCB_score(move);
+				if(node->get_role() == who)
+					score = node->UCB_score(move);
 				else
-					score = -node.UCB_score(move);
+					score = -node->UCB_score(move);
 				if(score > best_score){
 					*best_move = move;
-					best_score = node.UCB_score(move);
+					best_score = node->UCB_score(move);
 					best_after = after;
 				}
 			}
 				
 		}
-		if(node.has_child(*best_move)){
-			selection(best_after, node.child(*best_move));
+		if(node->has_child(*best_move)){
+			selection(best_after, node->child(*best_move));
 		}
 		else{
-			node.new_child(oppo, *best_move);
+			node->new_child(oppo, *best_move);
 
-			node.visit_record();
+			node->visit_record();
 		}
 		return action();
 	}
