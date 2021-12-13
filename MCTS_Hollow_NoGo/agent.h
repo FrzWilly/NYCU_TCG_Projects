@@ -213,31 +213,36 @@ public:
 		root(root->get_ptr()){};
 
 		std::shared_ptr<tree_node> get_root(){
+			return cur_root->get_ptr();
+		}
+
+		std::shared_ptr<tree_node> get_real_root(){
 			return root->get_ptr();
 		}
 
 		void move_root(action::place mv){
-			if(root->has_child(mv)){
+			if(cur_root->has_child(mv)){
 				// std::cout<<"move root A\n";
-				root = root->child(mv);
+				cur_root = cur_root->child(mv);
 			}
 			else{
 				// std::cout<<"move root B\n";
 				board::piece_type oppo;
-				if(root->get_role() == board::white)
+				if(cur_root->get_role() == board::white)
 					oppo = board::black;
 				else
 					oppo = board::white;
-				root->new_child(oppo, mv);
-				root = root->child(mv);
+				cur_root->new_child(oppo, mv);
+				cur_root = cur_root->child(mv);
 			}
 		}
 
 		void reset_tree(board::piece_type who){
-			root = std::make_shared<tree_node>(who);
+			cur_root = root;
 		}
 	private:
 		std::shared_ptr<tree_node> root;
+		std::shared_ptr<tree_node> cur_root;
 	};
 
 	virtual action random_take_action(const board& state, int role) {
@@ -361,6 +366,7 @@ public:
 			std::cout<<state<<std::endl;
 			exit(-1);
 		}
+		std::cout<<"root win_rate"<<MCT.get_root().
 		for (int i=0;i<100;i++) {
 			move = selection(state, MCT.get_root()).first;
 		}
