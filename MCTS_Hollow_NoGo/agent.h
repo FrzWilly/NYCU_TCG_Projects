@@ -167,8 +167,7 @@ public:
 		}
 
 		void new_child(board::piece_type role, action::place move){
-			auto new_node = std::make_shared<tree_node>(role, move);
-			children[move] = new_node;
+			children[move] = std::make_shared<tree_node>(role, move);
 		}
 
 		void visit_record(int result){
@@ -195,7 +194,7 @@ public:
 				c_winrate = INIT_WINRATE;
 				c_vcount = 0.1;
 			}
-			return c_winrate + C * sqrt(log(visit_count)/c_vcount);
+			return c_winrate + C * sqrt(log(visit_count+1)/c_vcount);
 		}
 		
 	private:
@@ -218,7 +217,24 @@ public:
 		}
 
 		void move_root(action::place mv){
-			root = root->child(mv);
+			if(root->has_child(mv)){
+				std::cout<<"move root A\n";
+				root = root->child(mv);
+			}
+			else{
+				std::cout<<"move root B\n";
+				board::piece_type oppo;
+				if(root->get_role() == board::white)
+					oppo = board::black;
+				else
+					oppo = board::white;
+				root->new_child(oppo, mv);
+				root = root->child(mv);
+			}
+		}
+
+		void reset_tree(board::piece_type who){
+			root = std::make_shared<tree_node>(who);
 		}
 	private:
 		std::shared_ptr<tree_node> root;
@@ -254,7 +270,7 @@ public:
 	}
 
 	virtual std::pair<action, int> selection(const board& state, std::shared_ptr<tree_node> node) {
-		action::place* best_move = nullptr;
+		action::place best_move;
 		int best_score = -999999;
 		board best_after;
 		auto auto_space = space;
@@ -271,33 +287,86 @@ public:
 				else
 					score = -node->UCB_score(move);
 				if(score > best_score){
-					*best_move = move;
-					best_score = node->UCB_score(move);
+					best_move = move;
+					best_score = score;
 					best_after = after;
 				}
 			}
 				
 		}
-		if(node->has_child(*best_move)){
+		if(node->has_child(best_move)){
 			std::pair<action, int> back_prop;
-			back_prop = selection(best_after, node->child(*best_move));
+			back_prop = selection(best_after, node->child(best_move));
 			node->visit_record(back_prop.second);
 		}
 		else{
-			node->new_child(oppo, *best_move);
-			result = simulation(best_after, node->get_ptr());
+			board::piece_type oppo_role;
+			if(node->get_role() == board::white)
+				oppo_role = board::black;
+			else
+				oppo_role = board::white;
+			node->new_child(oppo_role, best_move);
+			result = simulation(best_after, node->child(best_move));
 			node->visit_record(result);
 		}
-		return std::pair<action, int>(*best_move, result);
+		return std::pair<action, int>(best_move, result);
+	}
+
+	void handle_oppo_turn(const board& state){
+		action oppo_mv = action();
+		for (const action::place& mv : oppo_space) {
+			board after = last_board;
+			if (mv.apply(after) == board::legal){
+				if(after == state){
+					std::cout<<"find oppo move"<<mv<<std::endl;
+					oppo_mv = mv;
+					break;
+				}
+			}
+		}
+		if(oppo_mv == action()){
+			// std::cout<<"can't find opponent's move"<<std::endl;
+			// std::cout<<"last board:\n";
+			// std::cout<<last_board<<std::endl;
+			// std::cout<<"\n\ncurrent board:\n";
+			// std::cout<<state<<std::endl;
+			
+			/*new game*/
+			MCT.reset_tree(who);
+		}
+		else
+			MCT.move_root(oppo_mv);
 	}
 
 	virtual action take_action(const board& state) {
-		// std::shuffle(space.begin(), space.end(), engine);
+		std::cout<<"take action\n";
 		action move;
+		//update opponent move if state is not empty board
+		if(state != board()){
+			std::cout<<"update oppo\n";
+			handle_oppo_turn(state);
+		}
+		// check root role
+		std::cout<<"root role: "<<MCT.get_root()->get_role()<<std::endl;
+		if(MCT.get_root()->get_role() == who){
+			std::cout<<"wrong role at root"<<std::endl;
+			std::cout<<"\n\ncurrent board:\n";
+			std::cout<<state<<std::endl;
+			exit(-1);
+		}
 		for (int i=0;i<100;i++) {
 			move = selection(state, MCT.get_root()).first;
 		}
-		return action();
+		board after = state;
+		MCT.move_root(move);
+		if(move.apply(after) == board::legal){
+			last_board = after;
+			std::cout<<"move: "<<move<<std::endl;
+			std::cout<<"root role: "<<MCT.get_root()->get_role()<<std::endl;
+			return move;
+		}
+		else
+			return action();
 	}
 
 private:
@@ -306,6 +375,7 @@ private:
 	board::piece_type who;
 	board::piece_type oppo;
 	tree MCT;
+	board last_board;
 };
 
 
