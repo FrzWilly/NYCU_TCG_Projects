@@ -110,8 +110,8 @@ private:
 class MCTS_player : public random_agent {
 public:
 	MCTS_player(const std::string& args = "") : random_agent("name=random role=unknown " + args),
-		space(board::size_x * board::size_y), oppo_space(board::size_x * board::size_y), 
-		who(board::empty), oppo(board::empty), MCT(std::make_shared<tree_node>(who)){
+		space(board::size_x * board::size_y), oppo_space(board::size_x * board::size_y),
+		who(board::empty), oppo(board::empty), MCT(std::make_shared<tree_node>(who)), turn(0){
 		if (name().find_first_of("[]():; ") != std::string::npos)
 			throw std::invalid_argument("invalid name: " + name());
 		if (role() == "black") {
@@ -218,11 +218,11 @@ public:
 
 		void move_root(action::place mv){
 			if(root->has_child(mv)){
-				std::cout<<"move root A\n";
+				// std::cout<<"move root A\n";
 				root = root->child(mv);
 			}
 			else{
-				std::cout<<"move root B\n";
+				// std::cout<<"move root B\n";
 				board::piece_type oppo;
 				if(root->get_role() == board::white)
 					oppo = board::black;
@@ -318,7 +318,7 @@ public:
 			board after = last_board;
 			if (mv.apply(after) == board::legal){
 				if(after == state){
-					std::cout<<"find oppo move"<<mv<<std::endl;
+					// std::cout<<"find oppo move"<<mv<<std::endl;
 					oppo_mv = mv;
 					break;
 				}
@@ -332,6 +332,7 @@ public:
 			// std::cout<<state<<std::endl;
 			
 			/*new game*/
+			// std::cout<<"reset\n";
 			MCT.reset_tree(who);
 		}
 		else
@@ -339,16 +340,22 @@ public:
 	}
 
 	virtual action take_action(const board& state) {
-		std::cout<<"take action\n";
+		//std::cout<<"take action\n";
 		action move;
 		//update opponent move if state is not empty board
-		if(state != board()){
-			std::cout<<"update oppo\n";
+		if(turn){
+			// play as black and not init
+			//std::cout<<"update oppo\n";
 			handle_oppo_turn(state);
 		}
+		else{
+			// play as black init
+			MCT.reset_tree(who);
+		}
+		turn++;
 		// check root role
-		std::cout<<"root role: "<<MCT.get_root()->get_role()<<std::endl;
-		if(MCT.get_root()->get_role() == who){
+		// std::cout<<"root role: "<<MCT.get_root()->get_role()<<std::endl;
+		if(MCT.get_root()->get_role() != who){
 			std::cout<<"wrong role at root"<<std::endl;
 			std::cout<<"\n\ncurrent board:\n";
 			std::cout<<state<<std::endl;
@@ -361,8 +368,8 @@ public:
 		MCT.move_root(move);
 		if(move.apply(after) == board::legal){
 			last_board = after;
-			std::cout<<"move: "<<move<<std::endl;
-			std::cout<<"root role: "<<MCT.get_root()->get_role()<<std::endl;
+			// std::cout<<"move: "<<move<<std::endl;
+			// std::cout<<"root role: "<<MCT.get_root()->get_role()<<std::endl;
 			return move;
 		}
 		else
@@ -376,6 +383,7 @@ private:
 	board::piece_type oppo;
 	tree MCT;
 	board last_board;
+	int turn;
 };
 
 
