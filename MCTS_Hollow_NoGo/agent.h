@@ -111,7 +111,7 @@ class MCTS_player : public random_agent {
 public:
 	MCTS_player(const std::string& args = "") : random_agent("name=random role=unknown " + args),
 		space(board::size_x * board::size_y), oppo_space(board::size_x * board::size_y), 
-		who(board::empty), oppo(board::empty), MCT(tree_node(who)){
+		who(board::empty), oppo(board::empty), MCT(std::make_shared<tree_node>(who)){
 		if (name().find_first_of("[]():; ") != std::string::npos)
 			throw std::invalid_argument("invalid name: " + name());
 		if (role() == "black") {
@@ -129,7 +129,7 @@ public:
 		for (size_t i = 0; i < oppo_space.size(); i++)
 			oppo_space[i] = action::place(i, oppo);
 
-		MCT = tree(tree_node(who));
+		MCT = std::make_shared<tree_node>((who));
 	}
 
 	class tree_node
@@ -171,8 +171,13 @@ public:
 			children[move] = new_node;
 		}
 
-		void visit_record(){
-			visit_count++;
+		void visit_record(int result){
+			if(result){
+				int win = winrate*visit_count + 1;
+				winrate = win / visit_count++;
+			}
+			else
+				visit_count++;
 		}
 
 		board::piece_type& get_role(){
@@ -200,20 +205,32 @@ public:
 		double winrate;
 		int visit_count;
 		std::map<action::place, std::shared_ptr<MCTS_player::tree_node> > children;
-		tree_node* prev;
+		//tree_node* prev;
 	};
 
 	class tree{
 	public:
-		tree(MCTS_player::tree_node root):
-		root(root){};
+		tree(std::shared_ptr<tree_node> root):
+		root(root->get_ptr()){};
+
+		std::shared_ptr<tree_node> get_root(){
+			return root->get_ptr();
+		}
+
+		void move_root(action::place mv){
+			root = root->child(mv);
+		}
 	private:
-		MCTS_player::tree_node root;
+		std::shared_ptr<tree_node> root;
 	};
 
-	virtual action random_take_action(const board& state) {
-		std::shuffle(space.begin(), space.end(), engine);
-		for (const action::place& move : space) {
+	virtual action random_take_action(const board& state, int role) {
+		auto auto_space = space;
+		if(role)
+			auto_space = oppo_space;
+		std::shuffle(auto_space.begin(), auto_space.end(), engine);
+		
+		for (const action::place& move : auto_space) {
 			board after = state;
 			if (move.apply(after) == board::legal)
 				return move;
@@ -221,22 +238,30 @@ public:
 		return action();
 	}
 
-	virtual int simulation(const board& state, tree_node& node) {
+	virtual int simulation(const board& state, std::shared_ptr<tree_node> node) {
 		board after = state;
+		int role = 1;
+		if(node->get_role() == who){
+			role = 0;
+		}
 		while(1){
-			action::place move = random_take_action(after);
-			if(move == action()) break;
+			action::place move = random_take_action(after, role);
+			if(move == action()) return role;
+
+			move = random_take_action(after, (role xor 1));
+			if(move == action()) return (role xor 1);
 		}
 	}
 
-	virtual action selection(const board& state, std::shared_ptr<tree_node> node) {
-		std::shuffle(space.begin(), space.end(), engine);
+	virtual std::pair<action, int> selection(const board& state, std::shared_ptr<tree_node> node) {
 		action::place* best_move = nullptr;
 		int best_score = -999999;
 		board best_after;
 		auto auto_space = space;
+		int result;
 		if(node->get_role() == oppo)
 			auto_space = oppo_space;
+		std::shuffle(auto_space.begin(), auto_space.end(), engine);
 		for (const action::place& move : auto_space) {
 			board after = state;
 			int score;
@@ -254,22 +279,23 @@ public:
 				
 		}
 		if(node->has_child(*best_move)){
-			selection(best_after, node->child(*best_move));
+			std::pair<action, int> back_prop;
+			back_prop = selection(best_after, node->child(*best_move));
+			node->visit_record(back_prop.second);
 		}
 		else{
 			node->new_child(oppo, *best_move);
-
-			node->visit_record();
+			result = simulation(best_after, node->get_ptr());
+			node->visit_record(result);
 		}
-		return action();
+		return std::pair<action, int>(*best_move, result);
 	}
 
 	virtual action take_action(const board& state) {
 		// std::shuffle(space.begin(), space.end(), engine);
-		for (const action::place& move : space) {
-			board after = state;
-			if (move.apply(after) == board::legal)
-				return move;
+		action move;
+		for (int i=0;i<100;i++) {
+			move = selection(state, MCT.get_root()).first;
 		}
 		return action();
 	}
