@@ -18,6 +18,8 @@
 #include "action.h"
 #include <fstream>
 #include <memory>
+#include <ctime>
+#include <unistd.h>
 // UCB exploration ratio
 #define C 1.44
 //initial winrate of a unexpanded node in a Monte-Carlo tree
@@ -244,13 +246,20 @@ public:
 		auto auto_space = space;
 		if(role)
 			auto_space = oppo_space;
+		// std::cout<<"role: "<<role<<std::endl;
 		std::shuffle(auto_space.begin(), auto_space.end(), engine);
 		
 		for (const action::place& move : auto_space) {
 			board after = state;
 			if (move.apply(after) == board::legal)
 				return move;
+			else if(move.apply(after) == board::illegal_turn){
+				std::cout<<"wrong role..."<<std::endl;
+				return action();
+			}
 		}
+		// std::cout<<"no random action :(\n";
+		// std::cout<<state<<std::endl;
 		return action();
 	}
 
@@ -260,12 +269,26 @@ public:
 		if(node->get_role() == who){
 			role = 0;
 		}
+		// std::cout<<after<<std::endl;
+		// std::cout<<"simulation start as: "<<role<<" "<<(role xor 1)<<std::endl;
 		while(1){
+			//sstd::cout<<role<<" "<<(role xor 1)<<std::endl;
+			//std::cout<<after<<std::endl;
 			action::place move = random_take_action(after, role);
-			if(move == action()) return role;
+			if(move == action()) {
+				// std::cout<<"simulation end as: "<<role<<std::endl;
+				return role;
+			}
+			else
+				move.apply(after);
 
 			move = random_take_action(after, (role xor 1));
-			if(move == action()) return (role xor 1);
+			if(move == action()) {
+				// std::cout<<"simulation end as: "<<(role xor 1)<<std::endl;
+				return (role xor 1);
+			}
+			else
+				move.apply(after);
 		}
 	}
 
@@ -274,13 +297,16 @@ public:
 		int best_score = -999999;
 		board best_after;
 		auto auto_space = space;
+
 		int result;
 		if(node->get_role() == oppo)
 			auto_space = oppo_space;
 		std::shuffle(auto_space.begin(), auto_space.end(), engine);
 		for (const action::place& move : auto_space) {
 			board after = state;
+			//std::cout<<after<<"\n\n\n"<<std::endl;
 			int score;
+			// std::cout<<node->get_role()<<" "<<who<<" "<<move<<std::endl;
 			if (move.apply(after) == board::legal){
 				if(node->get_role() == who)
 					score = node->UCB_score(move);
@@ -292,7 +318,17 @@ public:
 					best_after = after;
 				}
 			}
+			// else{
+			// 	std::cout<<move.apply(after)<<std::endl;
+			// }
 				
+		}
+		if(best_score == -999999){
+			// std::cout<<"can't find legal action as child\n";
+			// std::cout<<"play as"<<node->get_role()<<"board: \n";
+			// std::cout<<state<<std::endl;
+			return std::pair<action, int>(action(), 0);
+
 		}
 		if(node->has_child(best_move)){
 			std::pair<action, int> back_prop;
@@ -334,6 +370,7 @@ public:
 			/*new game*/
 			// std::cout<<"reset\n";
 			MCT.reset_tree(who);
+			turn = 0;
 		}
 		else
 			MCT.move_root(oppo_mv);
@@ -346,11 +383,13 @@ public:
 		if(turn){
 			// play as black and not init
 			//std::cout<<"update oppo\n";
-			handle_oppo_turn(state);
+			board after = state;
+			handle_oppo_turn(after);
 		}
 		else{
 			// play as black init
 			MCT.reset_tree(who);
+			turn = 0;
 		}
 		turn++;
 		// check root role
@@ -362,7 +401,8 @@ public:
 			exit(-1);
 		}
 		for (int i=0;i<100;i++) {
-			move = selection(state, MCT.get_root()).first;
+			board after = state;
+			move = selection(after, MCT.get_root()).first;
 		}
 		board after = state;
 		MCT.move_root(move);
