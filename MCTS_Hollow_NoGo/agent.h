@@ -202,6 +202,7 @@ public:
 			while(iter != children.end()){
 				score = UCB_score(iter->first, role);
 				if(score > best_score){
+					std::cout<<score<<" > "<<best_score<<"\n";
 					best_score = score;
 					best_action = iter->first;
 				}
@@ -211,6 +212,8 @@ public:
 				// 	<< UCB_score(iter->first, role) << "]\n";
         		++iter;
 			}
+			std::cout<<"best score : "<<best_score<<"\n";
+			std::cout<<"best action : "<<best_action<<"\n";
 			return best_action;
 		}
 
@@ -307,10 +310,12 @@ public:
 		std::shared_ptr<tree_node> root;
 	};
 
-	virtual action random_take_action(const board& state, int role) {
+	virtual action random_take_action(const board& state, board::piece_type role) {
 		std::vector<action::place> auto_space(space);
-		if(role)
-			std::vector<action::place> auto_space(oppo_space);
+		if(role == oppo){
+			std::vector<action::place> newspace(oppo_space);
+			auto_space = newspace;
+		}
 		// std::cout<<"role: "<<role<<std::endl;
 		std::shuffle(auto_space.begin(), auto_space.end(), engine);
 		
@@ -319,38 +324,48 @@ public:
 			if (move.apply(after) == board::legal)
 				return move;
 			else if(move.apply(after) == board::illegal_turn){
-				// std::cout<<"wrong role..."<<std::endl;
+				std::cout<<"wrong role..."<<std::endl;
+				std::cout<<"move: "<<move<<std::endl;
 				return action();
 			}
 		}
-		// std::cout<<"no random action :(\n";
-		// std::cout<<state<<std::endl;
+		std::cout<<"no random action :(\n";
+		std::cout<<state<<std::endl;
 		return action();
 	}
 
 	virtual int simulation(const board& state, std::shared_ptr<tree_node> node) {
 		board after = state;
-		int role = 1;
-		if(node->get_role() == who){
-			role = 0;
+		board::piece_type role = node->get_role(), op;
+		int reward;
+		if(role == who){
+			reward = 0;
+			op = oppo;
 		}
+		else{
+			reward = 1;
+			op = who;
+		}
+		int count = 0;
 		// std::cout<<after<<std::endl;
 		// std::cout<<"simulation start as: "<<role<<" "<<(role xor 1)<<std::endl;
 		while(1){
+			count++;
 			//s// std::cout<<role<<" "<<(role xor 1)<<std::endl;
 			// std::cout<<after<<std::endl;
 			action::place move = random_take_action(after, role);
 			if(move == action()) {
-				// std::cout<<"simulation end as: "<<role<<std::endl;
-				return role;
+				std::cout<<"simulation end as: "<<role<<" total "<<count<<" turns"<<std::endl;
+				return reward;
 			}
 			else
 				move.apply(after);
 
-			move = random_take_action(after, (role xor 1));
+			move = random_take_action(after, op);
 			if(move == action()) {
+				std::cout<<"simulation end as: "<<op<<" total "<<count<<" turns"<<std::endl;
 				// std::cout<<"simulation end as: "<<(role xor 1)<<std::endl;
-				return (role xor 1);
+				return (reward xor 1);
 			}
 			else
 				move.apply(after);
@@ -564,9 +579,9 @@ public:
 			// std::cout<<"root winrate: "<<MCT.get_root()->get_winrate()<<std::endl;
 			// std::cout<<"move UCB score: "<<MCT.get_root()->UCB_score(move)<<std::endl;
 		}
-		if(most_visited != action()){
-			move = MCT.get_root()->best_children();
-		}
+		// if(most_visited == action()){
+		// 	move = MCT.get_root()->best_children();
+		// }
 		std::cout<<"root visit count: "<<MCT.get_root()->get_count()<<std::endl;
 		std::cout<<"root winrate: "<<MCT.get_root()->get_winrate()<<std::endl;
 		if(MCT.get_root()->UCB_score(move, who)!=999)
@@ -587,10 +602,10 @@ public:
 		std::cout<<"turn "<<turn<<" ended"<<std::endl;
 		if(move.apply(after) == board::legal){
 			last_board = after;
-			std::cout<<after<<std::endl;
-			std::cout<<"\n\n---------------------\n\n"<<std::endl;
 			std::cout<<"move: "<<move<<std::endl;
 			std::cout<<"root role: "<<MCT.get_root()->get_role()<<std::endl;
+			std::cout<<after<<std::endl;
+			std::cout<<"\n\n---------------------\n\n"<<std::endl;
 			return move;
 		}
 		else
