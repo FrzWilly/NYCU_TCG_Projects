@@ -175,13 +175,14 @@ public:
 		}
 
 		void visit_record(int result){
-			double old = winrate;
+			//double old = winrate;
 			//// std::cout<<"result: "<<result<<std::endl;
 			double win = winrate*visit_count + result;
 			visit_count++;
 			winrate = win / visit_count;
-			if(winrate>1)
-				std::cout<<"old winrate: "<<old<<" new winrate: "<<winrate<<std::endl;
+			//if(winrate>1)
+				//winrate = old;
+			 	//std::cout<<"old winrate: "<<old<<" new winrate: "<<winrate<<std::endl;
 		}
 
 		void list_all_children(){
@@ -202,7 +203,7 @@ public:
 			while(iter != children.end()){
 				score = UCB_score(iter->first, role);
 				if(score > best_score){
-					std::cout<<score<<" > "<<best_score<<"\n";
+					// std::cout<<score<<" > "<<best_score<<"\n";
 					best_score = score;
 					best_action = iter->first;
 				}
@@ -212,8 +213,8 @@ public:
 				// 	<< UCB_score(iter->first, role) << "]\n";
         		++iter;
 			}
-			std::cout<<"best score : "<<best_score<<"\n";
-			std::cout<<"best action : "<<best_action<<"\n";
+			// std::cout<<"best score : "<<best_score<<"\n";
+			// std::cout<<"best action : "<<best_action<<"\n";
 			return best_action;
 		}
 
@@ -290,9 +291,9 @@ public:
 				root = root->child(mv);
 			}
 			else{
-				std::cout<<"move root B, ba ka na !!!\n";
-				std::cout<<"move: "<<mv<<"\n";
-				root->list_all_children();
+				// std::cout<<"move root B, ba ka na !!!\n";
+				// std::cout<<"move: "<<mv<<"\n";
+				// root->list_all_children();
 				board::piece_type oppo;
 				if(root->get_role() == board::white)
 					oppo = board::black;
@@ -323,14 +324,14 @@ public:
 			board after = state;
 			if (move.apply(after) == board::legal)
 				return move;
-			else if(move.apply(after) == board::illegal_turn){
-				std::cout<<"wrong role..."<<std::endl;
-				std::cout<<"move: "<<move<<std::endl;
-				return action();
-			}
+			// else if(move.apply(after) == board::illegal_turn){
+			// 	// std::cout<<"wrong role..."<<std::endl;
+			// 	// std::cout<<"move: "<<move<<std::endl;
+			// 	return action();
+			// }
 		}
-		std::cout<<"no random action :(\n";
-		std::cout<<state<<std::endl;
+		// std::cout<<"no random action :(\n";
+		// std::cout<<state<<std::endl;
 		return action();
 	}
 
@@ -355,7 +356,7 @@ public:
 			// std::cout<<after<<std::endl;
 			action::place move = random_take_action(after, role);
 			if(move == action()) {
-				std::cout<<"simulation end as: "<<role<<" total "<<count<<" turns"<<std::endl;
+				// std::cout<<"simulation end as: "<<role<<" total "<<count<<" turns"<<std::endl;
 				return reward;
 			}
 			else
@@ -363,7 +364,7 @@ public:
 
 			move = random_take_action(after, op);
 			if(move == action()) {
-				std::cout<<"simulation end as: "<<op<<" total "<<count<<" turns"<<std::endl;
+				// std::cout<<"simulation end as: "<<op<<" total "<<count<<" turns"<<std::endl;
 				// std::cout<<"simulation end as: "<<(role xor 1)<<std::endl;
 				return (reward xor 1);
 			}
@@ -373,6 +374,7 @@ public:
 	}
 
 	virtual std::pair<action, int> selection(const board& state, std::shared_ptr<tree_node> node) {
+		//std::cout<<"in selection, "
 		action::place best_move;
 		double best_score = -999999;
 		board best_after;
@@ -402,10 +404,10 @@ public:
 				}
 			}
 			// if(turn > 30 &&best_score != -999999 && best_score != 999 && best_score != 0)
-			// 	std::cout<<"best_score "<<best_score<<std::endl;
-			// else{
-			// 	// std::cout<<move.apply(after)<<std::endl;
-			// }
+			// 	// std::cout<<"best_score "<<best_score<<std::endl;
+			else if(move.apply(after) == board::illegal_turn){
+				// std::cout<<"wrong role !!!"<<std::endl;
+			}
 				
 		}
 		if(best_score == -999999){
@@ -424,7 +426,13 @@ public:
 			// std::cout<<"select\n";
 			std::pair<action, int> back_prop;
 			back_prop = selection(best_after, node->child(best_move));
+			// if(node->get_role() == oppo){
+			// 	std::cout<<"oppo node update\n";
+			// }
 			node->visit_record(back_prop.second);
+			// if(node->get_role() == oppo){
+			// 	std::cout<<"oppo node update result: "<<node->get_winrate()<<", "<<node->get_count()<<"\n";
+			// }
 			// std::cout<<"select return\n";
 		}
 		else{
@@ -436,8 +444,20 @@ public:
 				oppo_role = board::white;
 			node->new_child(oppo_role, best_move);
 			result = simulation(best_after, node->child(best_move));
+			// if(oppo_role == oppo){
+			// 	std::cout<<"oppo node new child update\n";
+			// }
 			node->child(best_move)->visit_record(result);
+			// if(oppo_role == oppo){
+			// 	std::cout<<"oppo node update result: "<<node->child(best_move)->get_winrate()<<", "<<node->child(best_move)->get_count()<<"\n";
+			// }
+			// if(node->get_role() == oppo){
+			// 	std::cout<<"oppo node update\n";
+			// }
 			node->visit_record(result);
+			// if(node->get_role() == oppo){
+			// 	std::cout<<"oppo node update result: "<<node->get_winrate()<<", "<<node->get_count()<<"\n";
+			// }
 		}
 		return std::pair<action, int>(best_move, result);
 	}
@@ -448,7 +468,7 @@ public:
 			board after = last_board;
 			if (mv.apply(after) == board::legal){
 				if(after == state){
-					std::cout<<"find oppo move"<<mv<<std::endl;
+					// std::cout<<"find oppo move"<<mv<<std::endl;
 					oppo_mv = mv;
 					break;
 				}
@@ -465,22 +485,23 @@ public:
 			// std::cout<<"\n\n\n------reset------\n\n\n";
 			if(MCT.get_root()->get_winrate()==1){
 				won++;
-				std::cout<<"game won, w-l: "<<won<<" : "<<lost<<"\n";
+				// std::cout<<"game won, w-l: "<<won<<" : "<<lost<<"\n";
 			}
 			else if(MCT.get_root()->get_winrate()<=0){
 				lost++;
-				std::cout<<"game lost, w-l: "<<won<<" : "<<lost<<"\n";
+				// std::cout<<"game lost, w-l: "<<won<<" : "<<lost<<"\n";
 			}
 			else{
-				std::cout<<"game finished with root winrate "<<MCT.get_root()->get_winrate()<<"\n";
+				// std::cout<<"game finished with root winrate "<<MCT.get_root()->get_winrate()<<"\n";
 			}
 			MCT.reset_tree(who);
 			turn = 0;
 		}
 		else{
-			std::cout<<"check opponent root\n";
-			if(MCT.get_root()->has_child(oppo_mv))
-				MCT.get_root()->child(oppo_mv)->list_all_children();
+			// std::cout<<"check opponent root\n";
+			// if(MCT.get_root()->has_child(oppo_mv))
+			// 	MCT.get_root()->child(oppo_mv)->list_all_children();
+			// MCT.get_root()->list_all_children();
 			MCT.move_root(oppo_mv);
 		}
 	}
@@ -527,14 +548,14 @@ public:
 			// std::cout<<"\n\n\n------reset------\n\n\n";
 			if(MCT.get_root()->get_winrate()==1){
 				won++;
-				std::cout<<"game won, w-l: "<<won<<" : "<<lost<<"\n";
+				// std::cout<<"game won, w-l: "<<won<<" : "<<lost<<"\n";
 			}
 			else if(MCT.get_root()->get_winrate()<=0){
 				lost++;
-				std::cout<<"game lost, w-l: "<<won<<" : "<<lost<<"\n";
+				// std::cout<<"game lost, w-l: "<<won<<" : "<<lost<<"\n";
 			}
 			else{
-				std::cout<<"game finished with root winrate "<<MCT.get_root()->get_winrate()<<"\n";
+				// std::cout<<"game finished with root winrate "<<MCT.get_root()->get_winrate()<<"\n";
 			}
 			MCT.reset_tree(who);
 			turn = 0;
@@ -543,16 +564,18 @@ public:
 		// check root role
 		// std::cout<<"root role: "<<MCT.get_root()->get_role()<<std::endl;
 		if(MCT.get_root()->get_role() != who){
-			std::cout<<"wrong role at root"<<std::endl;
-			std::cout<<"\n\ncurrent board:\n";
-			std::cout<<state<<std::endl;
+			// std::cout<<"wrong role at root"<<std::endl;
+			// std::cout<<"\n\ncurrent board:\n";
+			// std::cout<<state<<std::endl;
 			exit(-1);
 		}
-		std::cout<<state<<std::endl;
-		std::cout<<"root visit count: "<<MCT.get_root()->get_count()<<std::endl;
-		std::cout<<"root winrate: "<<MCT.get_root()->get_winrate()<<std::endl;
-		if(MCT.get_root()->UCB_score(move, who)!=999)
-			std::cout<<"move UCB score: "<<MCT.get_root()->UCB_score(move, who)<<std::endl;
+		if(MCT.get_root()->get_winrate()){
+			// std::cout<<state<<std::endl;
+			// std::cout<<"root visit count: "<<MCT.get_root()->get_count()<<std::endl;
+			// std::cout<<"root winrate: "<<MCT.get_root()->get_winrate()<<std::endl;
+			//if(MCT.get_root()->UCB_score(move, who)!=999)
+				// std::cout<<"move UCB score: "<<MCT.get_root()->UCB_score(move, who)<<std::endl;
+		}
 		action most_visited = action();
 		for (int i=0;i<SIM_COUNT;i++) {
 			if(MCT.get_root()->check_leaf()){
@@ -579,33 +602,47 @@ public:
 			// std::cout<<"root winrate: "<<MCT.get_root()->get_winrate()<<std::endl;
 			// std::cout<<"move UCB score: "<<MCT.get_root()->UCB_score(move)<<std::endl;
 		}
+		// std::cout<<"\n\n";
+		// std::cout<<"after simulation childrean:\n";
+		// MCT.get_root()->list_all_children();
+		// std::cout<<"\nafter simulation new root childrean:\n";
+		// if(MCT.get_root()->has_child(move))
+		// 	MCT.get_root()->child(move)->list_all_children();
+		// else{
+		// 	std::cout<<"None\n";
+		// }
+		// std::cout<<"\n\n";
 		// if(most_visited == action()){
 		// 	move = MCT.get_root()->best_children();
 		// }
-		std::cout<<"root visit count: "<<MCT.get_root()->get_count()<<std::endl;
-		std::cout<<"root winrate: "<<MCT.get_root()->get_winrate()<<std::endl;
-		if(MCT.get_root()->UCB_score(move, who)!=999)
-			std::cout<<"move UCB score: "<<MCT.get_root()->UCB_score(move, who)<<std::endl;
-		MCT.get_root()->list_all_children();
+		// if(MCT.get_root()->get_winrate()){
+		// 	std::cout<<"root visit count: "<<MCT.get_root()->get_count()<<std::endl;
+		// 	std::cout<<"root winrate: "<<MCT.get_root()->get_winrate()<<std::endl;
+		// 	if(MCT.get_root()->UCB_score(move, who)!=999)
+		// 		std::cout<<"move UCB score: "<<MCT.get_root()->UCB_score(move, who)<<std::endl;
+		// 	MCT.get_root()->list_all_children();
+		// }
 		// if(MCT.get_root()->UCB_score(move) == 100){
 		// 	won++;
-		// 	std::cout<<"game won, w-l: "<<won<<" : "<<lost<<"\n";
+		// 	// std::cout<<"game won, w-l: "<<won<<" : "<<lost<<"\n";
 		// }
 		// else if(MCT.get_root()->UCB_score(move) < 0){
 		// 	lost++;
-		// 	std::cout<<"game lost, w-l: "<<won<<" : "<<lost<<"\n";
+		// 	// std::cout<<"game lost, w-l: "<<won<<" : "<<lost<<"\n";
 		// }
 		
 		board after = state;
 		MCT.move_root(move);
 		
-		std::cout<<"turn "<<turn<<" ended"<<std::endl;
+		// std::cout<<"turn "<<turn<<" ended"<<std::endl;
 		if(move.apply(after) == board::legal){
 			last_board = after;
-			std::cout<<"move: "<<move<<std::endl;
-			std::cout<<"root role: "<<MCT.get_root()->get_role()<<std::endl;
-			std::cout<<after<<std::endl;
-			std::cout<<"\n\n---------------------\n\n"<<std::endl;
+			if(MCT.get_root()->get_winrate()<0.5){
+				// std::cout<<"move: "<<move<<std::endl;
+				// std::cout<<"root role: "<<MCT.get_root()->get_role()<<std::endl;
+				// std::cout<<after<<std::endl;
+				// std::cout<<"\n\n---------------------\n\n"<<std::endl;
+			}
 			return move;
 		}
 		else
