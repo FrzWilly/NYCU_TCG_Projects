@@ -21,9 +21,11 @@
 #include <ctime>
 #include <unistd.h>
 // UCB exploration ratio
-#define C 1.0
+#define C 1.44
 //initial winrate of a unexpanded node in a Monte-Carlo tree
-#define INIT_WINRATE 0.5
+#define INIT_WINRATE 0.0
+//how many simulations have to perform per step
+#define SIM_COUNT 100
 
 class agent {
 public:
@@ -113,7 +115,7 @@ class MCTS_player : public random_agent {
 public:
 	MCTS_player(const std::string& args = "") : random_agent("name=random role=unknown " + args),
 		space(board::size_x * board::size_y), oppo_space(board::size_x * board::size_y),
-		who(board::empty), oppo(board::empty), MCT(std::make_shared<tree_node>(who)), turn(0){
+		who(board::empty), oppo(board::empty), MCT(std::make_shared<tree_node>(who)), turn(0), won(0), lost(0){
 		if (name().find_first_of("[]():; ") != std::string::npos)
 			throw std::invalid_argument("invalid name: " + name());
 		if (role() == "black") {
@@ -139,13 +141,13 @@ public:
 	{
 	public:
 		tree_node(board::piece_type role, action::place mv) :
-			role(role), move(mv){
+			role(role), move(mv), is_leaf(false){
 				winrate = INIT_WINRATE;
 				visit_count = 0;
 			}
 		// constructor used for initializing root
 		tree_node(board::piece_type role) :
-			role(role), move(action()){
+			role(role), move(action()), is_leaf(false){
 				winrate = INIT_WINRATE;
 				visit_count = 0;
 		}
@@ -164,7 +166,7 @@ public:
 			return children.count(move);
 		}
 
-		std::shared_ptr<tree_node> child(action::place& move){
+		std::shared_ptr<tree_node> child(action::place move){
 			return children[move]->get_ptr();
 		}
 
@@ -174,31 +176,65 @@ public:
 
 		void visit_record(int result){
 			double old = winrate;
-			if(result){
-				//std::cout<<"result: "<<result<<std::endl;
-				double win = winrate*visit_count + result;
-				winrate = win / ++visit_count;
+			//// std::cout<<"result: "<<result<<std::endl;
+			double win = winrate*visit_count + result;
+			visit_count++;
+			winrate = win / visit_count;
+			if(winrate>1)
 				std::cout<<"old winrate: "<<old<<" new winrate: "<<winrate<<std::endl;
+		}
+
+		void list_all_children(){
+			auto iter = children.begin();
+			while(iter != children.end()){
+				std::cout << "[" << iter->first << ","
+                    << iter->second->get_count()<< ","
+					<< iter->second->get_winrate()<< ","
+					<< UCB_score(iter->first, role) << "]\n";
+        		++iter;
 			}
-			else
-				visit_count++;
+		}
+
+		action best_children(){
+			action::place best_action = action();
+			double score, best_score = -999;
+			auto iter = children.begin();
+			while(iter != children.end()){
+				score = UCB_score(iter->first, role);
+				if(score > best_score){
+					best_score = score;
+					best_action = iter->first;
+				}
+				// std::cout << "[" << iter->first << ","
+                //     << iter->second->get_count()<< ","
+				// 	<< iter->second->get_winrate()<< ","
+				// 	<< UCB_score(iter->first, role) << "]\n";
+        		++iter;
+			}
+			return best_action;
 		}
 
 		board::piece_type& get_role(){
 			return role;
 		}
 
-		double UCB_score(action::place move){
+		double UCB_score(action::place move, board::piece_type who){
 			double c_winrate, c_vcount;
 			if(has_child(move)){
-				std::shared_ptr<tree_node> chld = children[move]->get_ptr();
-				c_winrate = chld->winrate;
-				c_vcount = chld->visit_count;
+				std::shared_ptr<tree_node> chld(children[move]->get_ptr());
+				if(chld->check_leaf())
+					return chld->get_winrate()*100;
+				c_winrate = chld->get_winrate();
+				c_vcount = chld->get_count();
 			}
 			else{
-				//return 999;
+				// return 999;
+				if(role == who)
+					return 99;
+				else
+					return 0;
 				c_winrate = INIT_WINRATE;
-				c_vcount = 0.1;
+				c_vcount = 0.0001;
 			}
 			return c_winrate + C * sqrt(log(visit_count)/c_vcount);
 		}
@@ -209,6 +245,18 @@ public:
 		int get_count(){
 			return visit_count;
 		}
+
+		void set_leaf(){
+			is_leaf = true;
+		}
+		bool check_leaf(){
+			return is_leaf;
+		}
+
+		void set_winrate(double value){
+			winrate = value;
+			visit_count++;
+		}
 		
 	private:
 		//int depth;
@@ -217,13 +265,14 @@ public:
 		double winrate;
 		int visit_count;
 		std::map<action::place, std::shared_ptr<MCTS_player::tree_node> > children;
+		bool is_leaf;
 		//tree_node* prev;
 	};
 
 	class tree{
 	public:
-		tree(std::shared_ptr<tree_node> root):
-		root(root->get_ptr()){};
+		tree(std::shared_ptr<tree_node> rot):
+		root(rot->get_ptr()){};
 
 		std::shared_ptr<tree_node> get_root(){
 			return root->get_ptr();
@@ -232,10 +281,15 @@ public:
 		void move_root(action::place mv){
 			if(root->has_child(mv)){
 				// std::cout<<"move root A\n";
+				// root->list_all_children();
+				// std::cout<<root->child(mv)->get_winrate();
+				// std::cout<<"child exist\n";
 				root = root->child(mv);
 			}
 			else{
-				// std::cout<<"move root B\n";
+				std::cout<<"move root B, ba ka na !!!\n";
+				std::cout<<"move: "<<mv<<"\n";
+				root->list_all_children();
 				board::piece_type oppo;
 				if(root->get_role() == board::white)
 					oppo = board::black;
@@ -254,9 +308,9 @@ public:
 	};
 
 	virtual action random_take_action(const board& state, int role) {
-		auto auto_space = space;
+		std::vector<action::place> auto_space(space);
 		if(role)
-			auto_space = oppo_space;
+			std::vector<action::place> auto_space(oppo_space);
 		// std::cout<<"role: "<<role<<std::endl;
 		std::shuffle(auto_space.begin(), auto_space.end(), engine);
 		
@@ -265,7 +319,7 @@ public:
 			if (move.apply(after) == board::legal)
 				return move;
 			else if(move.apply(after) == board::illegal_turn){
-				std::cout<<"wrong role..."<<std::endl;
+				// std::cout<<"wrong role..."<<std::endl;
 				return action();
 			}
 		}
@@ -283,7 +337,7 @@ public:
 		// std::cout<<after<<std::endl;
 		// std::cout<<"simulation start as: "<<role<<" "<<(role xor 1)<<std::endl;
 		while(1){
-			//sstd::cout<<role<<" "<<(role xor 1)<<std::endl;
+			//s// std::cout<<role<<" "<<(role xor 1)<<std::endl;
 			// std::cout<<after<<std::endl;
 			action::place move = random_take_action(after, role);
 			if(move == action()) {
@@ -315,22 +369,27 @@ public:
 		std::shuffle(auto_space.begin(), auto_space.end(), engine);
 		for (const action::place& move : auto_space) {
 			board after = state;
-			//std::cout<<after<<"\n\n\n"<<std::endl;
-			int score;
+			//// std::cout<<after<<"\n\n\n"<<std::endl;
+			double score;
 			// std::cout<<node->get_role()<<" "<<who<<" "<<move<<std::endl;
 			if (move.apply(after) == board::legal){
 				if(node->get_role() == who)
-					score = node->UCB_score(move);
+					score = node->UCB_score(move, who);
 				else
-					score = -node->UCB_score(move);
+					score = -node->UCB_score(move, who);
+				// if(score == -999){
+				// 	score = 0;
+				// }
 				if(score > best_score){
 					best_move = move;
 					best_score = score;
 					best_after = after;
 				}
 			}
+			// if(turn > 30 &&best_score != -999999 && best_score != 999 && best_score != 0)
+			// 	std::cout<<"best_score "<<best_score<<std::endl;
 			// else{
-			// 	std::cout<<move.apply(after)<<std::endl;
+			// 	// std::cout<<move.apply(after)<<std::endl;
 			// }
 				
 		}
@@ -341,7 +400,8 @@ public:
 			int win = -1;
 			if(node->get_role() == oppo)
 				win = 1;
-			node->visit_record(win*10);
+			node->set_winrate(win);
+			node->set_leaf();
 			return std::pair<action, int>(action(), win);
 
 		}
@@ -350,6 +410,7 @@ public:
 			std::pair<action, int> back_prop;
 			back_prop = selection(best_after, node->child(best_move));
 			node->visit_record(back_prop.second);
+			// std::cout<<"select return\n";
 		}
 		else{
 			// std::cout<<"expand\n";
@@ -360,6 +421,7 @@ public:
 				oppo_role = board::white;
 			node->new_child(oppo_role, best_move);
 			result = simulation(best_after, node->child(best_move));
+			node->child(best_move)->visit_record(result);
 			node->visit_record(result);
 		}
 		return std::pair<action, int>(best_move, result);
@@ -371,40 +433,94 @@ public:
 			board after = last_board;
 			if (mv.apply(after) == board::legal){
 				if(after == state){
-					// std::cout<<"find oppo move"<<mv<<std::endl;
+					std::cout<<"find oppo move"<<mv<<std::endl;
 					oppo_mv = mv;
 					break;
 				}
 			}
 		}
 		if(oppo_mv == action()){
-			std::cout<<"can't find opponent's move"<<std::endl;
-			std::cout<<"last board:\n";
-			std::cout<<last_board<<std::endl;
-			std::cout<<"\n\ncurrent board:\n";
-			std::cout<<state<<std::endl;
+			// std::cout<<"can't find opponent's move"<<std::endl;
+			// std::cout<<"last board:\n";
+			// std::cout<<last_board<<std::endl;
+			// std::cout<<"\n\ncurrent board:\n";
+			// std::cout<<state<<std::endl;
 			
 			/*new game*/
-			// std::cout<<"reset\n";
+			// std::cout<<"\n\n\n------reset------\n\n\n";
+			if(MCT.get_root()->get_winrate()==1){
+				won++;
+				std::cout<<"game won, w-l: "<<won<<" : "<<lost<<"\n";
+			}
+			else if(MCT.get_root()->get_winrate()<=0){
+				lost++;
+				std::cout<<"game lost, w-l: "<<won<<" : "<<lost<<"\n";
+			}
+			else{
+				std::cout<<"game finished with root winrate "<<MCT.get_root()->get_winrate()<<"\n";
+			}
 			MCT.reset_tree(who);
 			turn = 0;
 		}
-		else
+		else{
+			std::cout<<"check opponent root\n";
+			if(MCT.get_root()->has_child(oppo_mv))
+				MCT.get_root()->child(oppo_mv)->list_all_children();
 			MCT.move_root(oppo_mv);
+		}
+	}
+
+	action early(std::shared_ptr<tree_node> node){
+		int most=0, second=0;
+		action most_a, second_a;
+		int count=0;
+		for (const action::place& move : space) {
+			if(node->has_child(move)){
+				count++;
+				if(node->child(move)->get_count() > most){
+					second = most;
+					second_a = most_a;
+					most = node->child(move)->get_count();
+					most_a = move;
+				}
+				else if(node->child(move)->get_count() > second){
+					second = node->child(move)->get_count();
+					second_a = move;
+				}
+			}
+		}
+		// std::cout<<"child count: "<<count<<std::endl;
+		// std::cout<<"most: "<<most<<", second: "<<second<<std::endl;
+		if(most - (SIM_COUNT)*0.8 >= second){
+			return most_a;
+		}
+		return action();
 	}
 
 	virtual action take_action(const board& state) {
-		//std::cout<<"take action\n";
+		//// std::cout<<"take action\n";
 		action move;
 		//update opponent move if state is not empty board
 		if(turn){
 			// play as black and not init
-			//std::cout<<"update oppo\n";
+			//// std::cout<<"update oppo\n";
 			board after = state;
 			handle_oppo_turn(after);
 		}
 		else{
 			// play as black init
+			// std::cout<<"\n\n\n------reset------\n\n\n";
+			if(MCT.get_root()->get_winrate()==1){
+				won++;
+				std::cout<<"game won, w-l: "<<won<<" : "<<lost<<"\n";
+			}
+			else if(MCT.get_root()->get_winrate()<=0){
+				lost++;
+				std::cout<<"game lost, w-l: "<<won<<" : "<<lost<<"\n";
+			}
+			else{
+				std::cout<<"game finished with root winrate "<<MCT.get_root()->get_winrate()<<"\n";
+			}
 			MCT.reset_tree(who);
 			turn = 0;
 		}
@@ -417,22 +533,64 @@ public:
 			std::cout<<state<<std::endl;
 			exit(-1);
 		}
-		for (int i=0;i<100;i++) {
+		std::cout<<state<<std::endl;
+		std::cout<<"root visit count: "<<MCT.get_root()->get_count()<<std::endl;
+		std::cout<<"root winrate: "<<MCT.get_root()->get_winrate()<<std::endl;
+		if(MCT.get_root()->UCB_score(move, who)!=999)
+			std::cout<<"move UCB score: "<<MCT.get_root()->UCB_score(move, who)<<std::endl;
+		action most_visited = action();
+		for (int i=0;i<SIM_COUNT;i++) {
+			if(MCT.get_root()->check_leaf()){
+				// std::cout<<"root at leaf"<<std::endl;
+				move = action();
+				break;
+			}
+			// std::cout<<"root visit_count: "<<MCT.get_root()->get_count()<<std::endl;
 			board after = state;
-			move = selection(after, MCT.get_root()).first;
-			std::cout<<"simulation count: "<<i<<std::endl;
+			most_visited = early(MCT.get_root());
+			if(most_visited == action())
+				move = selection(after, MCT.get_root()).first;
+			else{
+				// std::cout<<"early activated"<<std::endl;
+				move = most_visited;
+				break;
+			}
+			// if(MCT.get_root()->child(move)->check_leaf() && MCT.get_root()->child(move)->get_winrate()==1){
+			// 	// std::cout<<"found win\n";
+			// 	break;
+			// }
+			// std::cout<<"chosen move: "<<move<<std::endl;
+			// std::cout<<"simulation count: "<<i<<std::endl;
 			// std::cout<<"root winrate: "<<MCT.get_root()->get_winrate()<<std::endl;
 			// std::cout<<"move UCB score: "<<MCT.get_root()->UCB_score(move)<<std::endl;
 		}
+		if(most_visited != action()){
+			move = MCT.get_root()->best_children();
+		}
+		std::cout<<"root visit count: "<<MCT.get_root()->get_count()<<std::endl;
 		std::cout<<"root winrate: "<<MCT.get_root()->get_winrate()<<std::endl;
-		std::cout<<"move UCB score: "<<MCT.get_root()->UCB_score(move)<<std::endl;
+		if(MCT.get_root()->UCB_score(move, who)!=999)
+			std::cout<<"move UCB score: "<<MCT.get_root()->UCB_score(move, who)<<std::endl;
+		MCT.get_root()->list_all_children();
+		// if(MCT.get_root()->UCB_score(move) == 100){
+		// 	won++;
+		// 	std::cout<<"game won, w-l: "<<won<<" : "<<lost<<"\n";
+		// }
+		// else if(MCT.get_root()->UCB_score(move) < 0){
+		// 	lost++;
+		// 	std::cout<<"game lost, w-l: "<<won<<" : "<<lost<<"\n";
+		// }
 		
 		board after = state;
 		MCT.move_root(move);
+		
+		std::cout<<"turn "<<turn<<" ended"<<std::endl;
 		if(move.apply(after) == board::legal){
 			last_board = after;
-			// std::cout<<"move: "<<move<<std::endl;
-			// std::cout<<"root role: "<<MCT.get_root()->get_role()<<std::endl;
+			std::cout<<after<<std::endl;
+			std::cout<<"\n\n---------------------\n\n"<<std::endl;
+			std::cout<<"move: "<<move<<std::endl;
+			std::cout<<"root role: "<<MCT.get_root()->get_role()<<std::endl;
 			return move;
 		}
 		else
@@ -447,6 +605,8 @@ private:
 	tree MCT;
 	board last_board;
 	int turn;
+	int won;
+	int lost;
 };
 
 
