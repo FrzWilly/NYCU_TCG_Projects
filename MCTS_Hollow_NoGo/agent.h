@@ -76,6 +76,31 @@ protected:
 };
 
 /**
+ * base agent for agents using MCTS method
+ */
+class MCTS_agent : public random_agent {
+public:
+	MCTS_agent(const std::string& args = "") : random_agent(args) {
+		if (meta.find("seed") != meta.end())
+			engine.seed(int(meta["seed"]));
+		if (meta.find("C") != meta.end())
+			exploration_w = double(meta["C"]);
+		else
+			exploration_w = C;
+		if (meta.find("fix_sim") != meta.end())
+			sim_count = double(meta["fix_sim"]);
+		else
+			sim_count = SIM_COUNT;
+	}
+	virtual ~MCTS_agent() {}
+
+protected:
+	std::default_random_engine engine;
+	double exploration_w;
+	int sim_count;
+};
+
+/**
  * random player for both side
  * put a legal piece randomly
  */
@@ -111,11 +136,11 @@ private:
 /**
  * MCTS player for both side
  */
-class MCTS_player : public random_agent {
+class MCTS_player : public MCTS_agent {
 public:
-	MCTS_player(const std::string& args = "") : random_agent("name=random role=unknown " + args),
+	MCTS_player(const std::string& args = "") : MCTS_agent("name=mcts role=unknown " + args),
 		space(board::size_x * board::size_y), oppo_space(board::size_x * board::size_y),
-		who(board::empty), oppo(board::empty), MCT(std::make_shared<tree_node>(who)), turn(0), won(0), lost(0){
+		who(board::empty), oppo(board::empty), MCT(std::make_shared<tree_node>(who, exploration_w), exploration_w), turn(0), won(0), lost(0){
 		if (name().find_first_of("[]():; ") != std::string::npos)
 			throw std::invalid_argument("invalid name: " + name());
 		if (role() == "black") {
@@ -133,21 +158,21 @@ public:
 		for (size_t i = 0; i < oppo_space.size(); i++)
 			oppo_space[i] = action::place(i, oppo);
 
-		MCT = std::make_shared<tree_node>((who));
+		MCT = tree(std::make_shared<tree_node>(who, exploration_w), exploration_w);
 	}
 
 	class tree_node
 	: public std::enable_shared_from_this<tree_node>
 	{
 	public:
-		tree_node(board::piece_type role, action::place mv) :
-			role(role), move(mv), is_leaf(false){
+		tree_node(board::piece_type role, action::place mv, double exp_w) :
+			role(role), move(mv), is_leaf(false), expw(exp_w){
 				winrate = INIT_WINRATE;
 				visit_count = 0;
 			}
 		// constructor used for initializing root
-		tree_node(board::piece_type role) :
-			role(role), move(action()), is_leaf(false){
+		tree_node(board::piece_type role, double exp_w) :
+			role(role), move(action()), is_leaf(false), expw(exp_w){
 				winrate = INIT_WINRATE;
 				visit_count = 0;
 		}
@@ -171,7 +196,7 @@ public:
 		}
 
 		void new_child(board::piece_type role, action::place move){
-			children[move] = std::make_shared<tree_node>(role, move);
+			children[move] = std::make_shared<tree_node>(role, move, expw);
 		}
 
 		void visit_record(int result){
@@ -240,7 +265,7 @@ public:
 				c_winrate = INIT_WINRATE;
 				c_vcount = 0.0001;
 			}
-			return c_winrate + C * sqrt(log(visit_count)/c_vcount);
+			return c_winrate + expw * sqrt(log(visit_count)/c_vcount);
 		}
 
 		double get_winrate(){
@@ -270,17 +295,23 @@ public:
 		int visit_count;
 		std::map<action::place, std::shared_ptr<MCTS_player::tree_node> > children;
 		bool is_leaf;
+		double expw;
 		//tree_node* prev;
 	};
 
 	class tree{
 	public:
-		tree(std::shared_ptr<tree_node> rot):
-		root(rot->get_ptr()){};
+		tree(std::shared_ptr<tree_node> rot, double exp_w):
+		root(rot->get_ptr()), expw(exp_w){};
 
 		std::shared_ptr<tree_node> get_root(){
 			return root->get_ptr();
 		}
+
+		// tree operator =(tree old){
+		// 	tree new_tree(old.get_root(), old.get_exp());
+		// 	return new_tree;
+		// }
 
 		void move_root(action::place mv){
 			if(root->has_child(mv)){
@@ -305,10 +336,14 @@ public:
 		}
 
 		void reset_tree(board::piece_type who){
-			root = std::make_shared<tree_node>(who);
+			root = std::make_shared<tree_node>(who, expw);
+		}
+		double get_exp(){
+			return expw;
 		}
 	private:
 		std::shared_ptr<tree_node> root;
+		double expw;
 	};
 
 	virtual action random_take_action(const board& state, board::piece_type role) {
@@ -577,7 +612,7 @@ public:
 				// std::cout<<"move UCB score: "<<MCT.get_root()->UCB_score(move, who)<<std::endl;
 		}
 		action most_visited = action();
-		for (int i=0;i<SIM_COUNT;i++) {
+		for (int i=0;i<sim_count;i++) {
 			if(MCT.get_root()->check_leaf()){
 				// std::cout<<"root at leaf"<<std::endl;
 				move = action();
@@ -585,14 +620,17 @@ public:
 			}
 			// std::cout<<"root visit_count: "<<MCT.get_root()->get_count()<<std::endl;
 			board after = state;
-			most_visited = early(MCT.get_root());
-			if(most_visited == action())
-				move = selection(after, MCT.get_root()).first;
-			else{
-				// std::cout<<"early activated"<<std::endl;
-				move = most_visited;
-				break;
-			}
+			move = selection(after, MCT.get_root()).first;
+			/* early */
+			// most_visited = early(MCT.get_root());
+			// if(most_visited == action())
+			// 	move = selection(after, MCT.get_root()).first;
+			// else{
+			// 	// std::cout<<"early activated"<<std::endl;
+			// 	move = most_visited;
+			// 	break;
+			// }
+
 			// if(MCT.get_root()->child(move)->check_leaf() && MCT.get_root()->child(move)->get_winrate()==1){
 			// 	// std::cout<<"found win\n";
 			// 	break;
