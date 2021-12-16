@@ -350,15 +350,15 @@ public:
 	};
 
 	virtual action random_take_action(const board& state, board::piece_type role) {
-		std::vector<action::place> auto_space = space;
+		std::vector<action::place> *auto_space = &space;
 		if(role == oppo){
 			// std::vector<action::place> newspace(oppo_space);
-			auto_space = oppo_space;
+			auto_space = &oppo_space;
 		}
 		// std::cout<<"role: "<<role<<std::endl;
 		// std::shuffle(auto_space.begin(), auto_space.end(), engine);
 		
-		for (const action::place& move : auto_space) {
+		for (const action::place& move : *auto_space) {
 			board after = state;
 			if (move.apply(after) == board::legal)
 				return move;
@@ -418,13 +418,13 @@ public:
 		action::place best_move;
 		double best_score = -999999;
 		board best_after;
-		auto auto_space = space;
+		std::vector<action::place> *auto_space = &space;
 
 		int result;
 		if(node->get_role() == oppo)
-			auto_space = oppo_space;
+			auto_space = &oppo_space;
 		//std::shuffle(auto_space.begin(), auto_space.end(), engine);
-		for (const action::place& move : auto_space) {
+		for (const action::place& move : *auto_space) {
 			board after = state;
 			//// std::cout<<after<<"\n\n\n"<<std::endl;
 			double score;
@@ -568,7 +568,7 @@ public:
 		}
 		// std::cout<<"child count: "<<count<<std::endl;
 		// std::cout<<"most: "<<most<<", second: "<<second<<std::endl;
-		if(most - (SIM_COUNT)*0.8 >= second){
+		if(most - (sim_count)*0.8 >= second){
 			return most_a;
 		}
 		return action();
@@ -637,16 +637,16 @@ public:
 			}
 			// std::cout<<"root visit_count: "<<MCT.get_root()->get_count()<<std::endl;
 			board after = state;
-			move = selection(after, MCT.get_root()).first;
+			// move = selection(after, MCT.get_root()).first;
 			/* early */
-			// most_visited = early(MCT.get_root());
-			// if(most_visited == action())
-			// 	move = selection(after, MCT.get_root()).first;
-			// else{
-			// 	// std::cout<<"early activated"<<std::endl;
-			// 	move = most_visited;
-			// 	break;
-			// }
+			most_visited = early(MCT.get_root());
+			if(most_visited == action())
+				move = selection(after, MCT.get_root()).first;
+			else{
+				// std::cout<<"early activated"<<std::endl;
+				move = most_visited;
+				break;
+			}
 
 			// if(MCT.get_root()->child(move)->check_leaf() && MCT.get_root()->child(move)->get_winrate()==1){
 			// 	// std::cout<<"found win\n";
