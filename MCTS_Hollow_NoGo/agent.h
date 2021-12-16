@@ -23,7 +23,7 @@
 // UCB exploration ratio
 #define C 1.44
 //initial winrate of a unexpanded node in a Monte-Carlo tree
-#define INIT_WINRATE 0.0
+#define INIT_WINRATE 0
 //how many simulations have to perform per step
 #define SIM_COUNT 100
 
@@ -170,21 +170,15 @@ public:
 	public:
 		tree_node(board::piece_type role, action::place mv, double exp_w) :
 			role(role), move(mv), is_leaf(false), expw(exp_w){
-				winrate = INIT_WINRATE;
+				wincount = INIT_WINRATE;
 				visit_count = 0;
 			}
 		// constructor used for initializing root
 		tree_node(board::piece_type role, double exp_w) :
 			role(role), move(action()), is_leaf(false), expw(exp_w){
-				winrate = INIT_WINRATE;
+				wincount = INIT_WINRATE;
 				visit_count = 0;
 		}
-
-		// tree_node(tree_node& node) :
-		// 	role(node.role), move(node.move){
-		// 		winrate = node.winrate;
-		// 		visit_count = node.visit_count;
-		// }
 
 		std::shared_ptr<tree_node> get_ptr(){
 			return shared_from_this();
@@ -203,14 +197,17 @@ public:
 		}
 
 		void visit_record(int result){
-			//double old = winrate;
-			//// std::cout<<"result: "<<result<<std::endl;
-			double win = winrate*visit_count + result;
+			// double old = winrate;
+			//std::cout<<"result: "<<result<<std::endl;
+			// std::cout<<"\n\n"<<winrate<<" "<<visit_count<<"\n";
+			wincount += result;
+			// double win = (double)(winrate*visit_count + (double)result);
 			visit_count++;
-			winrate = win / visit_count;
-			//if(winrate>1)
+			// std::cout<<win<<" "<<visit_count<<"\n\n";
+			// winrate = win / visit_count;
+			// if(winrate>1)
 				//winrate = old;
-			 	//std::cout<<"old winrate: "<<old<<" new winrate: "<<winrate<<std::endl;
+			 	// std::cout<<"old winrate: "<<old<<" new winrate: "<<winrate<<std::endl;
 		}
 
 		void list_all_children(){
@@ -218,7 +215,7 @@ public:
 			while(iter != children.end()){
 				std::cout << "[" << iter->first << ","
                     << iter->second->get_count()<< ","
-					<< iter->second->get_winrate()<< ","
+					<< iter->second->get_wincount()<< ","
 					<< UCB_score(iter->first, role) << "]\n";
         		++iter;
 			}
@@ -226,13 +223,15 @@ public:
 
 		action best_children(){
 			action::place best_action = action();
-			double score, best_score = -999;
+			double score, best_score = -99999;
+			int count, best_count = 0;
 			auto iter = children.begin();
 			while(iter != children.end()){
 				score = UCB_score(iter->first, role);
-				if(score > best_score){
+				count = iter->second->get_count();
+				if(count > best_count){
 					// std::cout<<score<<" > "<<best_score<<"\n";
-					best_score = score;
+					best_count = count;
 					best_action = iter->first;
 				}
 				// std::cout << "[" << iter->first << ","
@@ -251,28 +250,29 @@ public:
 		}
 
 		double UCB_score(action::place move, board::piece_type who){
-			double c_winrate, c_vcount;
+			int c_wincount, c_vcount;
 			if(has_child(move)){
 				std::shared_ptr<tree_node> chld(children[move]->get_ptr());
 				if(chld->check_leaf())
-					return chld->get_winrate()*100;
-				c_winrate = chld->get_winrate();
+					return chld->get_wincount()*200;
+				c_wincount = chld->get_wincount();
 				c_vcount = chld->get_count();
 			}
 			else{
-				// return 999;
+				//return 999;
 				if(role == who)
 					return 99;
 				else
 					return 0;
-				c_winrate = INIT_WINRATE;
-				c_vcount = 0.0001;
+				c_wincount = INIT_WINRATE;
+				c_vcount = 1;
 			}
-			return c_winrate + expw * sqrt(log(visit_count)/c_vcount);
+			// std::cout<<expw * sqrt(log((double)visit_count)/c_vcount)<<"\n";
+			return (double)c_wincount/c_vcount + expw * sqrt(log((double)visit_count)/c_vcount);
 		}
 
-		double get_winrate(){
-			return winrate;
+		double get_wincount(){
+			return wincount;
 		}
 		int get_count(){
 			return visit_count;
@@ -285,8 +285,8 @@ public:
 			return is_leaf;
 		}
 
-		void set_winrate(double value){
-			winrate = value;
+		void set_wincount(int value){
+			wincount = value;
 			visit_count++;
 		}
 		
@@ -294,7 +294,7 @@ public:
 		//int depth;
 		board::piece_type role;
 		action::place move;
-		double winrate;
+		int wincount;
 		int visit_count;
 		std::map<action::place, std::shared_ptr<MCTS_player::tree_node> > children;
 		bool is_leaf;
@@ -369,7 +369,7 @@ public:
 			// }
 		}
 		// std::cout<<"no random action :(\n";
-		// std::cout<<state<<std::endl;
+		// std::cout<<state<<std::endl; mu87;r6nu8		1
 		return action();
 	}
 
@@ -395,7 +395,7 @@ public:
 			action::place move = random_take_action(after, role);
 			if(move == action()) {
 				// std::cout<<"simulation end as: "<<role<<" total "<<count<<" turns"<<std::endl;
-				return reward;
+				return reward*5;
 			}
 			else
 				move.apply(after);
@@ -404,7 +404,7 @@ public:
 			if(move == action()) {
 				// std::cout<<"simulation end as: "<<op<<" total "<<count<<" turns"<<std::endl;
 				// std::cout<<"simulation end as: "<<(role xor 1)<<std::endl;
-				return (reward xor 1);
+				return (reward xor 1)*5;
 			}
 			else
 				move.apply(after);
@@ -443,9 +443,9 @@ public:
 			}
 			// if(turn > 30 &&best_score != -999999 && best_score != 999 && best_score != 0)
 			// 	// std::cout<<"best_score "<<best_score<<std::endl;
-			else if(move.apply(after) == board::illegal_turn){
-				// std::cout<<"wrong role !!!"<<std::endl;
-			}
+			// else if(move.apply(after) == board::illegal_turn){
+			// 	std::cout<<"wrong role !!!"<<std::endl;
+			// }
 				
 		}
 		if(best_score == -999999){
@@ -454,10 +454,10 @@ public:
 			// std::cout<<state<<std::endl;
 			int win = 0;
 			if(node->get_role() == oppo)
-				win = 1;
-			node->set_winrate(win);
+				win = 999;
+			node->set_wincount(win);
 			node->set_leaf();
-			return std::pair<action, int>(action(), win);
+			return std::pair<action, int>(action(), win%2);
 
 		}
 		if(node->has_child(best_move)){
@@ -534,6 +534,7 @@ public:
 			// }
 			MCT.reset_tree(who);
 			turn = 0;
+			// std::cout<<"reset\n";
 		}
 		else{
 			// std::cout<<"check opponent root\n";
@@ -607,6 +608,7 @@ public:
 			// }
 			MCT.reset_tree(who);
 			turn = 0;
+			// std::cout<<"reset\n";
 		}
 		turn++;
 		// check root role
@@ -653,9 +655,11 @@ public:
 			// std::cout<<"root winrate: "<<MCT.get_root()->get_winrate()<<std::endl;
 			// std::cout<<"move UCB score: "<<MCT.get_root()->UCB_score(move)<<std::endl;
 		}
+		move = MCT.get_root()->best_children();
 		// std::cout<<"\n\n";
 		// std::cout<<"after simulation childrean:\n";
 		// MCT.get_root()->list_all_children();
+		// std::cout<<"choose move: "<<move<<"\n";
 		// std::cout<<"\nafter simulation new root childrean:\n";
 		// if(MCT.get_root()->has_child(move))
 		// 	MCT.get_root()->child(move)->list_all_children();
