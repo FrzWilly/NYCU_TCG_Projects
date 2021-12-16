@@ -271,7 +271,7 @@ public:
 			return (double)c_wincount/c_vcount + expw * sqrt(log((double)visit_count)/c_vcount);
 		}
 
-		double get_wincount(){
+		int get_wincount(){
 			return wincount;
 		}
 		int get_count(){
@@ -350,13 +350,13 @@ public:
 	};
 
 	virtual action random_take_action(const board& state, board::piece_type role) {
-		std::vector<action::place> auto_space(space);
+		std::vector<action::place> auto_space = space;
 		if(role == oppo){
-			std::vector<action::place> newspace(oppo_space);
-			auto_space = newspace;
+			// std::vector<action::place> newspace(oppo_space);
+			auto_space = oppo_space;
 		}
 		// std::cout<<"role: "<<role<<std::endl;
-		std::shuffle(auto_space.begin(), auto_space.end(), engine);
+		// std::shuffle(auto_space.begin(), auto_space.end(), engine);
 		
 		for (const action::place& move : auto_space) {
 			board after = state;
@@ -388,6 +388,8 @@ public:
 		int count = 0;
 		// std::cout<<after<<std::endl;
 		// std::cout<<"simulation start as: "<<role<<" "<<(role xor 1)<<std::endl;
+		std::shuffle(space.begin(), space.end(), engine);
+		std::shuffle(oppo_space.begin(), oppo_space.end(), engine);
 		while(1){
 			count++;
 			//s// std::cout<<role<<" "<<(role xor 1)<<std::endl;
@@ -421,7 +423,7 @@ public:
 		int result;
 		if(node->get_role() == oppo)
 			auto_space = oppo_space;
-		std::shuffle(auto_space.begin(), auto_space.end(), engine);
+		//std::shuffle(auto_space.begin(), auto_space.end(), engine);
 		for (const action::place& move : auto_space) {
 			board after = state;
 			//// std::cout<<after<<"\n\n\n"<<std::endl;
