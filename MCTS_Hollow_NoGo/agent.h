@@ -26,6 +26,8 @@
 #define INIT_WINRATE 0
 //how many simulations have to perform per step
 #define SIM_COUNT 100
+//
+#define WIN_WEIGHT 5
 
 class agent {
 public:
@@ -140,7 +142,7 @@ class MCTS_player : public MCTS_agent {
 public:
 	MCTS_player(const std::string& args = "") : MCTS_agent("name=unknown role=unknown " + args),
 		space(board::size_x * board::size_y), oppo_space(board::size_x * board::size_y),
-		who(board::empty), oppo(board::empty), MCT(std::make_shared<tree_node>(who, exploration_w), exploration_w), turn(0), won(0), lost(0){
+		who(board::empty), oppo(board::empty), MCT(std::make_shared<tree_node>(who, exploration_w), exploration_w), turn(0){
 		if (name().find_first_of("[]():; ") != std::string::npos)
 			throw std::invalid_argument("invalid name: " + name());
 		else{
@@ -223,11 +225,11 @@ public:
 
 		action best_children(){
 			action::place best_action = action();
-			double score, best_score = -99999;
+			// double score, best_score = -99999;
 			int count, best_count = 0;
 			auto iter = children.begin();
 			while(iter != children.end()){
-				score = UCB_score(iter->first, role);
+				// score = UCB_score(iter->first, role);
 				count = iter->second->get_count();
 				if(count > best_count){
 					// std::cout<<score<<" > "<<best_score<<"\n";
@@ -397,7 +399,7 @@ public:
 			action::place move = random_take_action(after, role);
 			if(move == action()) {
 				// std::cout<<"simulation end as: "<<role<<" total "<<count<<" turns"<<std::endl;
-				return reward*5;
+				return reward*WIN_WEIGHT;
 			}
 			else
 				move.apply(after);
@@ -406,7 +408,7 @@ public:
 			if(move == action()) {
 				// std::cout<<"simulation end as: "<<op<<" total "<<count<<" turns"<<std::endl;
 				// std::cout<<"simulation end as: "<<(role xor 1)<<std::endl;
-				return (reward xor 1)*5;
+				return (reward xor 1)*WIN_WEIGHT;
 			}
 			else
 				move.apply(after);
@@ -456,10 +458,11 @@ public:
 			// std::cout<<state<<std::endl;
 			int win = 0;
 			if(node->get_role() == oppo)
-				win = 999;
+				win = (node->get_count()+1)*WIN_WEIGHT;
 			node->set_wincount(win);
 			node->set_leaf();
-			return std::pair<action, int>(action(), win%2);
+			if(win)win=WIN_WEIGHT;
+			return std::pair<action, int>(action(), win);
 
 		}
 		if(node->has_child(best_move)){
@@ -724,8 +727,8 @@ private:
 	tree MCT;
 	board last_board;
 	int turn;
-	int won;
-	int lost;
+	// int won;
+	// int lost;
 };
 
 
