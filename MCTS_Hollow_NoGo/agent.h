@@ -26,8 +26,10 @@
 #define INIT_WINRATE 0
 //how many simulations have to perform per step
 #define SIM_COUNT 100
-//
+//win value weight
 #define WIN_WEIGHT 5
+//how long to shuffle space and oppo_space once
+#define SHUFFLE_FREQ 1
 
 class agent {
 public:
@@ -227,7 +229,7 @@ public:
 			action::place best_action = action();
 			// double score, best_score = -99999;
 			int count, best_count = 0;
-			auto iter = children.begin();
+			auto iter = children.begin();	
 			while(iter != children.end()){
 				// score = UCB_score(iter->first, role);
 				count = iter->second->get_count();
@@ -375,8 +377,8 @@ public:
 		return action();
 	}
 
-	virtual int simulation(const board& state, std::shared_ptr<tree_node> node) {
-		board after = state;
+	virtual int simulation(board& state, std::shared_ptr<tree_node> node) {
+		//board after = state;
 		board::piece_type role = node->get_role(), op;
 		int reward;
 		if(role == who){
@@ -396,22 +398,22 @@ public:
 			count++;
 			//s// std::cout<<role<<" "<<(role xor 1)<<std::endl;
 			// std::cout<<after<<std::endl;
-			action::place move = random_take_action(after, role);
+			action::place move = random_take_action(state, role);
 			if(move == action()) {
 				// std::cout<<"simulation end as: "<<role<<" total "<<count<<" turns"<<std::endl;
 				return reward*WIN_WEIGHT;
 			}
 			else
-				move.apply(after);
+				move.apply(state);
 
-			move = random_take_action(after, op);
+			move = random_take_action(state, op);
 			if(move == action()) {
 				// std::cout<<"simulation end as: "<<op<<" total "<<count<<" turns"<<std::endl;
 				// std::cout<<"simulation end as: "<<(role xor 1)<<std::endl;
 				return (reward xor 1)*WIN_WEIGHT;
 			}
 			else
-				move.apply(after);
+				move.apply(state);
 		}
 	}
 
@@ -419,17 +421,17 @@ public:
 		//std::cout<<"in selection, "
 		action::place best_move;
 		double best_score = -999999;
-		board best_after;
+		board best_after(state);
 		std::vector<action::place> *auto_space = &space;
 
 		int result;
 		if(node->get_role() == oppo)
 			auto_space = &oppo_space;
 		//std::shuffle(auto_space.begin(), auto_space.end(), engine);
+		double score;
 		for (const action::place& move : *auto_space) {
 			board after = state;
 			//// std::cout<<after<<"\n\n\n"<<std::endl;
-			double score;
 			// std::cout<<node->get_role()<<" "<<who<<" "<<move<<std::endl;
 			if (move.apply(after) == board::legal){
 				if(node->get_role() == who)
@@ -442,7 +444,7 @@ public:
 				if(score > best_score){
 					best_move = move;
 					best_score = score;
-					best_after = after;
+					//best_after = after;
 				}
 			}
 			// if(turn > 30 &&best_score != -999999 && best_score != 999 && best_score != 0)
@@ -452,6 +454,8 @@ public:
 			// }
 				
 		}
+		best_move.apply(best_after);
+
 		if(best_score == -999999){
 			// std::cout<<"can't find legal action as child\n";
 			// std::cout<<"play as "<<node->get_role()<<", board: \n";
@@ -635,6 +639,10 @@ public:
 		for (int i=0;i<sim_count;i++) {
 			if(MCT.get_root()->check_leaf()){
 				// std::cout<<"root at leaf"<<std::endl;
+				// if(i % SHUFFLE_FREQ == 0){
+				// 	std::shuffle(space.begin(), space.end(), engine);
+				// 	std::shuffle(oppo_space.begin(), oppo_space.end(), engine);
+				// }
 				move = action();
 				break;
 			}
@@ -642,14 +650,18 @@ public:
 			board after = state;
 			// move = selection(after, MCT.get_root()).first;
 			/* early */
-			most_visited = early(MCT.get_root());
-			if(most_visited == action())
-				move = selection(after, MCT.get_root()).first;
-			else{
-				// std::cout<<"early activated"<<std::endl;
-				move = most_visited;
-				break;
+			if(i%(sim_count/10)==0){
+				most_visited = early(MCT.get_root());
+				if(most_visited == action())
+					move = selection(after, MCT.get_root()).first;
+				else{
+					// std::cout<<"early activated"<<std::endl;
+					move = most_visited;
+					break;
+				}
 			}
+			else
+				move = selection(after, MCT.get_root()).first;
 
 			// if(MCT.get_root()->child(move)->check_leaf() && MCT.get_root()->child(move)->get_winrate()==1){
 			// 	// std::cout<<"found win\n";
