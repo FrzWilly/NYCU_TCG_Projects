@@ -326,7 +326,7 @@ public:
 				// root->list_all_children();
 				// std::cout<<root->child(mv)->get_winrate();
 				// std::cout<<"child exist\n";
-				root = root->child(mv);
+				root = root->child(mv)->get_ptr();
 			}
 			else{
 				// std::cout<<"move root B, ba ka na !!!\n";
@@ -338,7 +338,7 @@ public:
 				else
 					oppo = board::white;
 				root->new_child(oppo, mv);
-				root = root->child(mv);
+				root = root->child(mv)->get_ptr();
 			}
 		}
 
@@ -392,8 +392,10 @@ public:
 		int count = 0;
 		// std::cout<<after<<std::endl;
 		// std::cout<<"simulation start as: "<<role<<" "<<(role xor 1)<<std::endl;
-		std::shuffle(space.begin(), space.end(), engine);
-		std::shuffle(oppo_space.begin(), oppo_space.end(), engine);
+		if(turn%2)
+			std::shuffle(space.begin(), space.end(), engine);
+		else
+			std::shuffle(oppo_space.begin(), oppo_space.end(), engine);
 		while(1){
 			count++;
 			//s// std::cout<<role<<" "<<(role xor 1)<<std::endl;
@@ -490,7 +492,7 @@ public:
 			else
 				oppo_role = board::white;
 			node->new_child(oppo_role, best_move);
-			result = simulation(best_after, node->child(best_move));
+			result = simulation(best_after, node->child(best_move)->get_ptr());
 			// if(oppo_role == oppo){
 			// 	std::cout<<"oppo node new child update\n";
 			// }
@@ -598,8 +600,7 @@ public:
 		if(turn){
 			// play as black and not init
 			//// std::cout<<"update oppo\n";
-			board after = state;
-			handle_oppo_turn(after);
+			handle_oppo_turn(state);
 		}
 		else{
 			// play as black init
@@ -653,7 +654,7 @@ public:
 			if(i%(sim_count/10)==0){
 				most_visited = early(MCT.get_root());
 				if(most_visited == action())
-					move = selection(after, MCT.get_root()).first;
+					move = selection(after, MCT.get_root()->get_ptr()).first;
 				else{
 					// std::cout<<"early activated"<<std::endl;
 					move = most_visited;
@@ -661,7 +662,7 @@ public:
 				}
 			}
 			else
-				move = selection(after, MCT.get_root()).first;
+				move = selection(after, MCT.get_root()->get_ptr()).first;
 
 			// if(MCT.get_root()->child(move)->check_leaf() && MCT.get_root()->child(move)->get_winrate()==1){
 			// 	// std::cout<<"found win\n";
