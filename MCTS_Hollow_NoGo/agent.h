@@ -92,9 +92,13 @@ public:
 		else
 			exploration_w = C;
 		if (meta.find("fix_sim") != meta.end())
-			sim_count = double(meta["fix_sim"]);
+			sim_count = int(meta["fix_sim"]);
 		else
 			sim_count = SIM_COUNT;
+		if (meta.find("early") != meta.end())
+			if_early = true;
+		else
+			if_early = false;
 	}
 	virtual ~MCTS_agent() {}
 
@@ -102,6 +106,7 @@ protected:
 	std::default_random_engine engine;
 	double exploration_w;
 	int sim_count;
+	bool if_early;
 };
 
 /**
@@ -577,7 +582,7 @@ public:
 		}
 		// std::cout<<"child count: "<<count<<std::endl;
 		// std::cout<<"most: "<<most<<", second: "<<second<<std::endl;
-		if(most - (sim_count)*0.8 >= second){
+		if(most - (sim_count)*0.6 >= second){
 			return most_a;
 		}
 		return action();
@@ -637,6 +642,14 @@ public:
 		// 		std::cout<<"move UCB score: "<<MCT.get_root()->UCB_score(move, who)<<std::endl;
 		// }
 		action most_visited = action();
+		if(if_early){
+			most_visited = early(MCT.get_root());
+			/* early: if a node has majority votes just choose it */
+			if(most_visited != action()){
+				std::cout<<"early activated\n";
+				goto selection_end;
+			}
+		}
 		for (int i=0;i<sim_count;i++) {
 			if(MCT.get_root()->check_leaf()){
 				// std::cout<<"root at leaf"<<std::endl;
@@ -649,20 +662,20 @@ public:
 			}
 			// std::cout<<"root visit_count: "<<MCT.get_root()->get_count()<<std::endl;
 			board after = state;
-			// move = selection(after, MCT.get_root()).first;
-			/* early */
-			if(i%(sim_count/10)==0){
-				most_visited = early(MCT.get_root());
-				if(most_visited == action())
-					move = selection(after, MCT.get_root()->get_ptr()).first;
-				else{
-					// std::cout<<"early activated"<<std::endl;
-					move = most_visited;
-					break;
-				}
-			}
-			else
-				move = selection(after, MCT.get_root()->get_ptr()).first;
+			move = selection(after, MCT.get_root()->get_ptr()).first;
+			/* check early multiple times version */
+			// if(i%(sim_count/10)==0){
+			// 	most_visited = early(MCT.get_root());
+			// 	if(most_visited == action())
+			// 		move = selection(after, MCT.get_root()->get_ptr()).first;
+			// 	else{
+			// 		// std::cout<<"early activated"<<std::endl;
+			// 		move = most_visited;
+			// 		break;
+			// 	}
+			// }
+			// else
+			// 	move = selection(after, MCT.get_root()->get_ptr()).first;
 
 			// if(MCT.get_root()->child(move)->check_leaf() && MCT.get_root()->child(move)->get_winrate()==1){
 			// 	// std::cout<<"found win\n";
@@ -673,6 +686,7 @@ public:
 			// std::cout<<"root winrate: "<<MCT.get_root()->get_winrate()<<std::endl;
 			// std::cout<<"move UCB score: "<<MCT.get_root()->UCB_score(move)<<std::endl;
 		}
+		selection_end:
 		move = MCT.get_root()->best_children();
 		// std::cout<<"\n\n";
 		// std::cout<<"after simulation childrean:\n";
