@@ -270,7 +270,7 @@ public:
 			else{
 				//return 999;
 				if(role == who)
-					return 99;
+					return 999;
 				else
 					return 0;
 				c_wincount = INIT_WINRATE;
@@ -483,7 +483,8 @@ public:
 			// if(node->get_role() == oppo){
 			// 	std::cout<<"oppo node update\n";
 			// }
-			node->visit_record(back_prop.second);
+			result = back_prop.second;
+			node->visit_record(result);
 			// if(node->get_role() == oppo){
 			// 	std::cout<<"oppo node update result: "<<node->get_winrate()<<", "<<node->get_count()<<"\n";
 			// }
