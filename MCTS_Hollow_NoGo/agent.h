@@ -26,8 +26,14 @@
 #define INIT_WINRATE 0
 //how many simulations have to perform per step
 #define SIM_COUNT 100
-//
+//win value weight
 #define WIN_WEIGHT 5
+//default basic formula constant for time management
+#define BASIC_C 60
+//default enhanced formula parameter max_ply for time management
+#define ENHANCED_PEAK 30
+//initial time limit(ms), less than actual time limit just in case
+#define INIT_TIME 35.0
 
 class agent {
 public:
@@ -82,17 +88,31 @@ protected:
  */
 class MCTS_agent : public random_agent {
 public:
-	MCTS_agent(const std::string& args = "") : random_agent(args) {
+	MCTS_agent(const std::string& args = "") : random_agent(args),
+		basic_const(0), enhanced_peak(0) {
 		if (meta.find("seed") != meta.end())
 			engine.seed(int(meta["seed"]));
 		if (meta.find("C") != meta.end())
 			exploration_w = double(meta["C"]);
 		else
 			exploration_w = C;
+
 		if (meta.find("fix_sim") != meta.end())
 			sim_count = int(meta["fix_sim"]);
 		else
 			sim_count = SIM_COUNT;
+
+		if (meta.find("enhanced_f") != meta.end()){
+			enhanced_peak = int(meta["enhanced_f"]);
+			sim_count = 99999999;
+		}
+		if(meta.find("basic_f") != meta.end()){
+			basic_const = int(meta["basic_f"]);
+			sim_count = 99999999;
+		}
+		else
+			basic_const = BASIC_C;
+
 		if (meta.find("early") != meta.end())
 			if_early = true;
 		else
@@ -103,6 +123,8 @@ public:
 protected:
 	std::default_random_engine engine;
 	double exploration_w;
+	int basic_const;
+	int enhanced_peak;
 	int sim_count;
 	bool if_early;
 };
@@ -147,7 +169,8 @@ class MCTS_player : public MCTS_agent {
 public:
 	MCTS_player(const std::string& args = "") : MCTS_agent("name=unknown role=unknown " + args),
 		space(board::size_x * board::size_y), oppo_space(board::size_x * board::size_y),
-		who(board::empty), oppo(board::empty), MCT(std::make_shared<tree_node>(who, exploration_w), exploration_w), turn(0){
+		who(board::empty), oppo(board::empty), MCT(std::make_shared<tree_node>(who, exploration_w), exploration_w),
+		 turn(0), remaining_time(INIT_TIME){
 		if (name().find_first_of("[]():; ") != std::string::npos)
 			throw std::invalid_argument("invalid name: " + name());
 		else{
@@ -547,6 +570,8 @@ public:
 			// }
 			MCT.reset_tree(who);
 			turn = 0;
+			std::cout<<"total cost time: "<<INIT_TIME - remaining_time<<std::endl;
+			remaining_time = INIT_TIME;
 			// std::cout<<"reset\n";
 		}
 		else{
@@ -579,7 +604,7 @@ public:
 		}
 		// std::cout<<"child count: "<<count<<std::endl;
 		// std::cout<<"most: "<<most<<", second: "<<second<<std::endl;
-		if(most - (sim_count)*0.6 >= second){
+		if(most - (sim_count)*0.8 >= second){
 			return most_a;
 		}
 		return action();
@@ -596,7 +621,17 @@ public:
 	}
 
 	virtual action mcts_take_action(const board& state) {
-		//// std::cout<<"take action\n";
+		clock_t start, end;
+		start = clock();
+		double thinking_time = 0;
+		if(enhanced_peak){
+			// std::cout<<"check\n";
+			thinking_time = remaining_time / (basic_const + std::max(enhanced_peak - turn, 0));
+		}
+		else if(basic_const){
+			thinking_time = remaining_time / basic_const;
+		}
+		// std::cout<<"thinking time: "<<thinking_time<<std::endl;
 		action move;
 		//update opponent move if state is not empty board
 		if(turn){
@@ -620,6 +655,7 @@ public:
 			// }
 			MCT.reset_tree(who);
 			turn = 0;
+			remaining_time = INIT_TIME;
 			// std::cout<<"reset\n";
 		}
 		turn++;
@@ -643,11 +679,19 @@ public:
 			most_visited = early(MCT.get_root());
 			/* early: if a node has majority votes just choose it */
 			if(most_visited != action()){
-				std::cout<<"early activated\n";
+				// std::cout<<"early activated\n";
 				goto selection_end;
 			}
 		}
 		for (int i=0;i<sim_count;i++) {
+			end = clock();
+			double cost = (double)(end - start) / CLOCKS_PER_SEC;
+			// std::cout<<"cost time"<<cost<<std::endl;
+			// std::cout<<"sim count"<<i<<std::endl;
+			if((cost >= thinking_time) && basic_const){
+				// std::cout<<"sim count: "<<i<<std::endl;
+				break;
+			}
 			if(MCT.get_root()->check_leaf()){
 				// std::cout<<"root at leaf"<<std::endl;
 				move = action();
@@ -723,6 +767,9 @@ public:
 			// 	std::cout<<after<<std::endl;
 			// 	std::cout<<"\n\n---------------------\n\n"<<std::endl;
 			// }
+			end = clock();
+			double cost = (double)(end - start) / CLOCKS_PER_SEC;
+			remaining_time -= cost;
 			return move;
 		}
 		else
@@ -747,6 +794,7 @@ private:
 	tree MCT;
 	board last_board;
 	int turn;
+	double remaining_time;
 	// int won;
 	// int lost;
 };
