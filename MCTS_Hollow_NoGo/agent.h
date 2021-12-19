@@ -92,6 +92,10 @@ public:
 		basic_const(0), enhanced_peak(0) {
 		if (meta.find("seed") != meta.end())
 			engine.seed(int(meta["seed"]));
+		if (meta.find("search") != meta.end())
+			search = std::string(meta["seach"]);
+		else
+			search = "random";
 		if (meta.find("C") != meta.end())
 			exploration_w = double(meta["C"]);
 		else
@@ -127,6 +131,7 @@ protected:
 	int enhanced_peak;
 	int sim_count;
 	bool if_early;
+	std::string search;
 };
 
 /**
@@ -173,9 +178,6 @@ public:
 		 turn(0), remaining_time(INIT_TIME){
 		if (name().find_first_of("[]():; ") != std::string::npos)
 			throw std::invalid_argument("invalid name: " + name());
-		else{
-			strategy = name();
-		}
 		if (role() == "black") {
 			who = board::black;
 			oppo = board::white;
@@ -621,16 +623,15 @@ public:
 	}
 
 	virtual action take_action(const board& state) {
-		if(strategy == "mcts")
+		if(search == "mcts")
 			return mcts_take_action(state);
-		else if(strategy == "random")
+		else if(search == "random")
 			return random_player_take_action(state);
 
 		return action();
 	}
 
 private:
-	std::string strategy;
 	std::vector<action::place> space;
 	std::vector<action::place> oppo_space;
 	board::piece_type who;
