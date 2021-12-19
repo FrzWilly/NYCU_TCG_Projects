@@ -499,7 +499,7 @@ public:
 
 			MCT.reset_tree(who);
 			turn = 0;
-			std::cout<<"total cost time: "<<INIT_TIME - remaining_time<<std::endl;
+			// std::cout<<"total cost time: "<<INIT_TIME - remaining_time<<std::endl;
 			remaining_time = INIT_TIME;
 		}
 		else{
