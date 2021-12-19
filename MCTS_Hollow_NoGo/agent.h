@@ -9,6 +9,7 @@
 
 #pragma once
 #include <string>
+#include <cstring>
 #include <random>
 #include <sstream>
 #include <map>
@@ -38,7 +39,7 @@
 class agent {
 public:
 	agent(const std::string& args = "") {
-		std::stringstream ss("name=unknown role=unknown " + args);
+		std::stringstream ss("name=unknown role=unknown search=unknown" + args);
 		for (std::string pair; ss >> pair; ) {
 			std::string key = pair.substr(0, pair.find('='));
 			std::string value = pair.substr(pair.find('=') + 1);
@@ -56,6 +57,7 @@ public:
 	virtual void notify(const std::string& msg) { meta[msg.substr(0, msg.find('='))] = { msg.substr(msg.find('=') + 1) }; }
 	virtual std::string name() const { return property("name"); }
 	virtual std::string role() const { return property("role"); }
+	virtual std::string search() const { return property("search"); }
 
 protected:
 	typedef std::string key;
@@ -92,10 +94,6 @@ public:
 		basic_const(0), enhanced_peak(0) {
 		if (meta.find("seed") != meta.end())
 			engine.seed(int(meta["seed"]));
-		if (meta.find("search") != meta.end())
-			search = std::string(meta["seach"]);
-		else
-			search = "random";
 		if (meta.find("C") != meta.end())
 			exploration_w = double(meta["C"]);
 		else
@@ -121,6 +119,7 @@ public:
 			if_early = true;
 		else
 			if_early = false;
+		// std::cout<<"search: "<<search<<std::endl;
 	}
 	virtual ~MCTS_agent() {}
 
@@ -131,7 +130,7 @@ protected:
 	int enhanced_peak;
 	int sim_count;
 	bool if_early;
-	std::string search;
+	// std::string search;
 };
 
 /**
@@ -186,6 +185,11 @@ public:
 			who = board::white;
 			oppo = board::black;
 		}
+		if(search() !=""){
+			strategy = search();
+		}
+		else
+			strategy = "random";
 		if (who == board::empty)
 			throw std::invalid_argument("invalid role: " + role());
 		for (size_t i = 0; i < space.size(); i++)
@@ -623,15 +627,16 @@ public:
 	}
 
 	virtual action take_action(const board& state) {
-		if(search == "mcts")
+		if(strategy == "MCTS")
 			return mcts_take_action(state);
-		else if(search == "random")
+		else if(strategy == "random")
 			return random_player_take_action(state);
 
 		return action();
 	}
 
 private:
+	std::string strategy;
 	std::vector<action::place> space;
 	std::vector<action::place> oppo_space;
 	board::piece_type who;
