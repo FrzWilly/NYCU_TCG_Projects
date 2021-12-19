@@ -35,6 +35,8 @@
 #define ENHANCED_PEAK 30
 //initial time limit(ms), less than actual time limit just in case
 #define INIT_TIME 35.0
+//early activate threshold
+#define EARLY_T 1000
 
 class agent {
 public:
@@ -526,7 +528,7 @@ public:
 				}
 			}
 		}
-		if(most - (sim_count)*0.8 >= second){
+		if(most - EARLY_T >= second){
 			return most_a;
 		}
 		return action();
