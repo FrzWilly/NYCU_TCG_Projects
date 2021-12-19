@@ -549,7 +549,7 @@ public:
 		start = clock();
 		double thinking_time = 0;
 		if(enhanced_peak){
-			thinking_time = remaining_time / (basic_const + std::max(enhanced_peak - turn, 0));
+			thinking_time = remaining_time / (basic_const + std::max(enhanced_peak - turn*2, 0));
 		}
 		else if(basic_const){
 			thinking_time = remaining_time / basic_const;
