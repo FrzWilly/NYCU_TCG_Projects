@@ -93,7 +93,7 @@ protected:
 class MCTS_agent : public random_agent {
 public:
 	MCTS_agent(const std::string& args = "") : random_agent(args),
-		basic_const(0), enhanced_peak(0) {
+		basic_const(0), enhanced_peak(0), use_time_management(false) {
 		if (meta.find("seed") != meta.end())
 			engine.seed(int(meta["seed"]));
 		if (meta.find("C") != meta.end())
@@ -109,10 +109,12 @@ public:
 		if (meta.find("enhanced_f") != meta.end()){
 			enhanced_peak = int(meta["enhanced_f"]);
 			sim_count = 99999999;
+			use_time_management = true;
 		}
 		if(meta.find("basic_f") != meta.end()){
 			basic_const = int(meta["basic_f"]);
 			sim_count = 99999999;
+			use_time_management = true;
 		}
 		else
 			basic_const = BASIC_C;
@@ -132,6 +134,7 @@ protected:
 	int enhanced_peak;
 	int sim_count;
 	bool if_early;
+	bool use_time_management;
 	// std::string search;
 };
 
@@ -587,7 +590,7 @@ public:
 		for (int i=0;i<sim_count;i++) {
 			end = clock();
 			double cost = (double)(end - start) / CLOCKS_PER_SEC;
-			if((cost >= thinking_time) && basic_const){
+			if((cost >= thinking_time) && use_time_management){
 				break;
 			}
 			if(MCT.get_root()->check_leaf()){
