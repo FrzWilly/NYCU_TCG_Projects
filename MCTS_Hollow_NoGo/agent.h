@@ -36,7 +36,7 @@
 //initial time limit(ms), less than actual time limit just in case
 #define INIT_TIME 35.0
 //early activate threshold
-#define EARLY_T 1000
+#define EARLY_T 5000
 
 class agent {
 public:
