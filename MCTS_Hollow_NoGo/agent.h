@@ -93,7 +93,8 @@ protected:
 class MCTS_agent : public random_agent {
 public:
 	MCTS_agent(const std::string& args = "") : random_agent(args),
-		basic_const(0), enhanced_peak(0), use_time_management(false) {
+		basic_const(0), enhanced_peak(0), use_time_management(false),
+		 unst_N(0){
 		if (meta.find("seed") != meta.end())
 			engine.seed(int(meta["seed"]));
 		if (meta.find("C") != meta.end())
@@ -123,6 +124,10 @@ public:
 			if_early = true;
 		else
 			if_early = false;
+
+		if (meta.find("unst") != meta.end())
+			unst_N = int(meta["unst"]);
+
 		// std::cout<<"search: "<<search<<std::endl;
 	}
 	virtual ~MCTS_agent() {}
@@ -135,6 +140,7 @@ protected:
 	int sim_count;
 	bool if_early;
 	bool use_time_management;
+	int unst_N;
 	// std::string search;
 };
 
@@ -264,6 +270,29 @@ public:
 				if(count > best_count){
 					// std::cout<<score<<" > "<<best_score<<"\n";
 					best_count = count;
+					best_action = iter->first;
+				}
+				// std::cout << "[" << iter->first << ","
+                //     << iter->second->get_count()<< ","
+				// 	<< iter->second->get_winrate()<< ","
+				// 	<< UCB_score(iter->first, role) << "]\n";
+        		++iter;
+			}
+			return best_action;
+		}
+
+		action highest_win_children(){
+			action::place best_action = action();
+			// double score, best_score = -99999;
+			double winrate, best_winrate = 0;
+			auto iter = children.begin();
+			while(iter != children.end()){
+				// score = UCB_score(iter->first, role);
+				winrate = (double)(iter->second->get_wincount()) / (iter->second->get_count());
+				
+				if(winrate > best_winrate){
+					// std::cout<<score<<" > "<<best_score<<"\n";
+					best_winrate = winrate;
 					best_action = iter->first;
 				}
 				// std::cout << "[" << iter->first << ","
@@ -537,6 +566,12 @@ public:
 		return action();
 	}
 
+	bool is_unstable(action &move){
+		action winrate_move = MCT.get_root()->highest_win_children();
+		move = MCT.get_root()->best_children();
+		return (winrate_move != move && move != action());
+	}
+
 	virtual action random_player_take_action(const board& state) {
 		std::shuffle(space.begin(), space.end(), engine);
 		for (const action::place& move : space) {
@@ -557,7 +592,7 @@ public:
 		else if(basic_const){
 			thinking_time = remaining_time / basic_const;
 		}
-		std::cout<<"thinking_time this step: "<<thinking_time<<std::endl;
+		// std::cout<<"thinking_time this step: "<<thinking_time<<std::endl;
 		action move;
 		//update opponent move if state is not empty board
 		if(turn){
@@ -592,9 +627,9 @@ public:
 			end = clock();
 			double cost = (double)(end - start) / CLOCKS_PER_SEC;
 			if((cost >= thinking_time) && use_time_management){
-				std::cout<<"rollout count: "<<i<<"\n";
-				std::cout<<"avg count per second: "<<(double)i / thinking_time;
-				std::cout<<"\n--------------\n\n";
+				// std::cout<<"rollout count: "<<i<<"\n";
+				// std::cout<<"avg count per second: "<<(double)i / thinking_time;
+				// std::cout<<"\n--------------\n\n";
 				break;
 			}
 			if(MCT.get_root()->check_leaf()){
@@ -618,7 +653,34 @@ public:
 			// 	move = selection(after, MCT.get_root()->get_ptr()).first;
 		}
 		selection_end:
-		move = MCT.get_root()->best_children();
+		/* unstable time-management method */
+		if(unst_N){
+			clock_t start2;
+			move = MCT.get_root()->best_children();
+			int unst_N_thisstep = unst_N;
+			while(unst_N_thisstep-- && is_unstable(move)){
+				start2 = clock();
+				for (int i=0;i<sim_count;i++) {
+					end = clock();
+					double cost = (double)(end - start2) / CLOCKS_PER_SEC;
+					if((cost >= thinking_time/2) && use_time_management){
+						// std::cout<<"rollout count: "<<i<<"\n";
+						// std::cout<<"avg count per second: "<<(double)i / thinking_time;
+						// std::cout<<"\n--------------\n\n";
+						break;
+					}
+					if(MCT.get_root()->check_leaf()){
+						move = action();
+						break;
+					}
+					board after = state;
+					move = selection(after, MCT.get_root()->get_ptr()).first;
+				}
+			}
+			move = MCT.get_root()->best_children();
+		}
+		else
+			move = MCT.get_root()->best_children();
 		
 		board after = state;
 		MCT.move_root(move);
