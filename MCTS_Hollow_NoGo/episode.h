@@ -18,6 +18,7 @@
 #include "board.h"
 #include "action.h"
 #include "agent.h"
+#include "agent_2.h"
 
 class statistic;
 

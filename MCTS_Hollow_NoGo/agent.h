@@ -557,6 +557,7 @@ public:
 		else if(basic_const){
 			thinking_time = remaining_time / basic_const;
 		}
+		std::cout<<"thinking_time this step: "<<thinking_time<<std::endl;
 		action move;
 		//update opponent move if state is not empty board
 		if(turn){
@@ -591,6 +592,9 @@ public:
 			end = clock();
 			double cost = (double)(end - start) / CLOCKS_PER_SEC;
 			if((cost >= thinking_time) && use_time_management){
+				std::cout<<"rollout count: "<<i<<"\n";
+				std::cout<<"avg count per second: "<<(double)i / thinking_time;
+				std::cout<<"\n--------------\n\n";
 				break;
 			}
 			if(MCT.get_root()->check_leaf()){

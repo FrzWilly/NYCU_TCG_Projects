@@ -19,62 +19,16 @@
 #include <fstream>
 #include <chrono>
 #include <cassert>
+#include "agent.h"
 
-class agent {
-public:
-	agent(const std::string& args = "") {
-		std::stringstream ss("name=unknown role=unknown " + args);
-		for (std::string pair; ss >> pair; ) {
-			std::string key = pair.substr(0, pair.find('='));
-			std::string value = pair.substr(pair.find('=') + 1);
-			meta[key] = { value };
-		}
-	}
-	virtual ~agent() {}
-	virtual void open_episode(const std::string& flag = "") {}
-	virtual void close_episode(const std::string& flag = "") {}
-	virtual action take_action(const board& b) { return action(); }
-	virtual bool check_for_win(const board& b) { return false; }
-
-public:
-	virtual std::string property(const std::string& key) const { return meta.at(key); }
-	virtual void notify(const std::string& msg) { meta[msg.substr(0, msg.find('='))] = { msg.substr(msg.find('=') + 1) }; }
-	virtual std::string name() const { return property("name"); }
-	virtual std::string role() const { return property("role"); }
-
-protected:
-	typedef std::string key;
-	struct value {
-		std::string value;
-		operator std::string() const { return value; }
-		template<typename numeric, typename = typename std::enable_if<std::is_arithmetic<numeric>::value, numeric>::type>
-		operator numeric() const { return numeric(std::stod(value)); }
-	};
-	std::map<key, value> meta;
-};
-
-/**
- * base agent for agents with randomness
- */
-class random_agent : public agent {
-public:
-	random_agent(const std::string& args = "") : agent(args) {
-		if (meta.find("seed") != meta.end())
-			engine.seed(int(meta["seed"]));
-	}
-	virtual ~random_agent() {}
-
-protected:
-	std::default_random_engine engine;
-};
 
 /**
  * player for both side
  */
-class player : public random_agent {
+class judge_player : public random_agent {
 public:
-	player(const std::string& args = "") : random_agent("N=0 T=0 c=0.1 psi=-1 " + args),
-		mcts(size_t(meta["N"]) | size_t(meta["T"])),
+	judge_player(const std::string& args = "") : random_agent("N=0 T=0 c=0.1 psi=-1 " + args),
+		// mcts(size_t(meta["N"]) | size_t(meta["T"])),
 		space(board::size_x * board::size_y), who(board::empty) {
 		if (meta.find("weak") != meta.end()) { // TCG weak sample player
 			mcts = true;
