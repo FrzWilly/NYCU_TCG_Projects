@@ -30,13 +30,17 @@
 //win value weight
 #define WIN_WEIGHT 5
 //default basic formula constant for time management
-#define BASIC_C 60
+#define BASIC_C 30
 //default enhanced formula parameter max_ply for time management
 #define ENHANCED_PEAK 30
 //initial time limit(ms), less than actual time limit just in case
-#define INIT_TIME 35.0
+#define INIT_TIME 36.0
 //early activate threshold
 #define EARLY_T 5000
+// equally expand thinking time to fully utilize given time if 
+// some time-management use only part of given time
+// set this to 1 to turn-off bonus
+#define TIME_BONUS 1
 
 class agent {
 public:
@@ -94,7 +98,7 @@ class MCTS_agent : public random_agent {
 public:
 	MCTS_agent(const std::string& args = "") : random_agent(args),
 		basic_const(0), enhanced_peak(0), use_time_management(false),
-		 unst_N(0){
+		 unst_N(0), time_bonus(1){
 		if (meta.find("seed") != meta.end())
 			engine.seed(int(meta["seed"]));
 		if (meta.find("C") != meta.end())
@@ -128,6 +132,9 @@ public:
 		if (meta.find("unst") != meta.end())
 			unst_N = int(meta["unst"]);
 
+		if (meta.find("t_bonus") != meta.end())
+			time_bonus = double(meta["t_bonus"]);
+
 		// std::cout<<"search: "<<search<<std::endl;
 	}
 	virtual ~MCTS_agent() {}
@@ -141,6 +148,7 @@ protected:
 	bool if_early;
 	bool use_time_management;
 	int unst_N;
+	double time_bonus;
 	// std::string search;
 };
 
@@ -267,7 +275,7 @@ public:
 			while(iter != children.end()){
 				// score = UCB_score(iter->first, role);
 				count = iter->second->get_count();
-				if(count > best_count){
+				if(count >= best_count){
 					// std::cout<<score<<" > "<<best_score<<"\n";
 					best_count = count;
 					best_action = iter->first;
@@ -290,7 +298,7 @@ public:
 				// score = UCB_score(iter->first, role);
 				winrate = (double)(iter->second->get_wincount()) / (iter->second->get_count());
 				
-				if(winrate > best_winrate){
+				if(winrate >= best_winrate){
 					// std::cout<<score<<" > "<<best_score<<"\n";
 					best_winrate = winrate;
 					best_action = iter->first;
@@ -531,6 +539,8 @@ public:
 			/* can't find opponent's move */
 			/* new game */
 
+			std::cout<<"game reset, remain time:"<<remaining_time<<std::endl;
+
 			MCT.reset_tree(who);
 			turn = 0;
 			// std::cout<<"total cost time: "<<INIT_TIME - remaining_time<<std::endl;
@@ -592,6 +602,7 @@ public:
 		else if(basic_const){
 			thinking_time = remaining_time / basic_const;
 		}
+		thinking_time *= time_bonus;
 		// std::cout<<"thinking_time this step: "<<thinking_time<<std::endl;
 		action move;
 		//update opponent move if state is not empty board
@@ -601,7 +612,8 @@ public:
 		}
 		else{
 			// init
-			
+			std::cout<<"game reset, remain time:"<<remaining_time<<std::endl;
+
 			MCT.reset_tree(who);
 			turn = 0;
 			remaining_time = INIT_TIME;
