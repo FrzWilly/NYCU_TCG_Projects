@@ -34,7 +34,7 @@
 //default enhanced formula parameter max_ply for time management
 #define ENHANCED_PEAK 30
 //initial time limit(ms), less than actual time limit just in case
-#define INIT_TIME 36.0
+#define INIT_TIME 300.0
 //early activate threshold
 #define EARLY_T 5000
 // equally expand thinking time to fully utilize given time if 
