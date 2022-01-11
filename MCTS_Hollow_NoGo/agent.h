@@ -105,7 +105,8 @@ class MCTS_agent : public random_agent {
 public:
 	MCTS_agent(const std::string& args = "") : random_agent(args),
 		basic_const(0), enhanced_peak(0), use_time_management(false),
-		 unst_N(0), time_bonus(1), leaf_parallel(0), earlyc_p(0){
+		 unst_N(0), time_bonus(1), leaf_parallel(0), earlyc_p(0),
+		 f_open(0){
 		if (meta.find("seed") != meta.end())
 			engine.seed(int(meta["seed"]));
 		if (meta.find("C") != meta.end())
@@ -130,6 +131,12 @@ public:
 		}
 		else
 			basic_const = BASIC_C;
+
+		if(meta.find("open") != meta.end()){
+			f_open = double(meta["open"]);
+			sim_count = 99999999;
+			use_time_management = true;
+		}
 
 		if (meta.find("early") != meta.end())
 			if_early = true;
@@ -168,6 +175,7 @@ protected:
 	double time_bonus;
 	int leaf_parallel;
 	double earlyc_p;
+	double f_open;
 	// std::string search;
 };
 
@@ -287,6 +295,16 @@ public:
 					<< UCB_score(iter->first, role) << "]\n";
         		++iter;
 			}
+		}
+
+		int children_count(){
+			int count=0;
+			auto iter = children.begin();
+			while(iter != children.end()){
+				count++;
+        		++iter;
+			}
+			return count;
 		}
 
 		action best_children(){
@@ -633,6 +651,20 @@ public:
 		return (winrate_move != move && move != action());
 	}
 
+	int m_expected(int turn, const board& state){
+
+		int exp = (MCT.get_root()->children_count());
+		int heuristic = std::max(33 - turn, 2);;
+		
+		return exp <= 1 ? heuristic : exp;
+		// int empty_count = 0;
+		// for (unsigned i = 0; i < 81; i++)
+		// 	if (state(i) == board::empty)
+		// 		empty_count++;
+		//return std::max(33 - turn, 2);
+		// return empty_count/2;
+	}
+
 	virtual action random_player_take_action(const board& state) {
 		std::shuffle(space.begin(), space.end(), engine);
 		for (const action::place& move : space) {
@@ -647,8 +679,14 @@ public:
 		clock_t start, end;
 		start = millisec();
 		double thinking_time = 0;
-		
-		if(enhanced_peak){
+		if(f_open && enhanced_peak){
+			thinking_time = f_open * remaining_time / std::min(m_expected(turn, state), 
+				(basic_const + std::max(enhanced_peak - turn*2, 0)));
+		}
+		else if(f_open){
+			thinking_time = f_open * remaining_time / m_expected(turn, state);
+		}
+		else if(enhanced_peak){
 			thinking_time = remaining_time / (basic_const + std::max(enhanced_peak - turn*2, 0));
 		}
 		else if(basic_const){
@@ -695,10 +733,10 @@ public:
 			// std::cout<<cost<<" : "<<thinking_time<<std::endl;
 			if((cost >= thinking_time) && use_time_management){
 				simcount_lastturn = (double)i / thinking_time;
-				std::cout<<"leaf parallelization: "<<leaf_parallel<<"\n";
-				std::cout<<"rollout count: "<<i * std::max(1, leaf_parallel)<<"\n";
-				std::cout<<"avg count per second: "<<(double)i / thinking_time;
-				std::cout<<"\n--------------\n\n";
+				// std::cout<<"leaf parallelization: "<<leaf_parallel<<"\n";
+				// std::cout<<"rollout count: "<<i * std::max(1, leaf_parallel)<<"\n";
+				// std::cout<<"avg count per second: "<<(double)i / thinking_time;
+				// std::cout<<"\n--------------\n\n";
 				break;
 			}
 			if(MCT.get_root()->check_leaf()){
@@ -728,10 +766,10 @@ public:
 					end = millisec();
 					double cost = (double)(end - start2) / CLOCKS_PER_SEC;
 					if((cost >= thinking_time/2) && use_time_management){
-						simcount_lastturn += i;
-						std::cout<<"rollout count: "<<i * std::max(1, leaf_parallel)<<"\n";
-						std::cout<<"avg count per second: "<<(double)i / thinking_time;
-						std::cout<<"\n--------------\n\n";
+						// simcount_lastturn += i;
+						// std::cout<<"rollout count: "<<i * std::max(1, leaf_parallel)<<"\n";
+						// std::cout<<"avg count per second: "<<(double)i / thinking_time;
+						// std::cout<<"\n--------------\n\n";
 						break;
 					}
 					if(MCT.get_root()->check_leaf()){
@@ -747,6 +785,8 @@ public:
 		else
 			move = MCT.get_root()->best_children();
 			// std::cout<<"----------------------\n";
+
+		simcount_lastturn /= thinking_time;
 
 		// if(leaf_parallel)
 		// 	MCT.get_root()->list_all_children();
@@ -795,7 +835,7 @@ private:
 	double remaining_time;
 	std::vector<std::thread> threads;
 	std::queue<int> simulation_results;
-	int simcount_lastturn;
+	double simcount_lastturn;
 	// int won;
 	// int lost;
 };
