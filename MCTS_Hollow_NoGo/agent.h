@@ -105,7 +105,7 @@ class MCTS_agent : public random_agent {
 public:
 	MCTS_agent(const std::string& args = "") : random_agent(args),
 		basic_const(0), enhanced_peak(0), use_time_management(false),
-		 unst_N(0), time_bonus(1), leaf_parallel(0){
+		 unst_N(0), time_bonus(1), leaf_parallel(0), earlyc_p(0){
 		if (meta.find("seed") != meta.end())
 			engine.seed(int(meta["seed"]));
 		if (meta.find("C") != meta.end())
@@ -136,6 +136,13 @@ public:
 		else
 			if_early = false;
 
+		if (meta.find("early_c") != meta.end()){
+			if_early = true;
+			earlyc_p = double(meta["early_c"]);
+		}
+		else
+			if_early = false;
+
 		if (meta.find("unst") != meta.end())
 			unst_N = int(meta["unst"]);
 
@@ -160,6 +167,7 @@ protected:
 	int unst_N;
 	double time_bonus;
 	int leaf_parallel;
+	double earlyc_p;
 	// std::string search;
 };
 
@@ -521,7 +529,7 @@ public:
 				oppo_role = board::black;
 			else
 				oppo_role = board::white;
-			begin = clock();
+			begin = millisec();
 			node->new_child(oppo_role, best_move);
 			if(leaf_parallel){
 				// std::cout<<"here;)\n";
@@ -543,7 +551,7 @@ public:
 			else
 				// result = simulation(best_after, node->child(best_move)->get_ptr());
 				result = rollout(best_after);
-			finish = clock();
+			finish = millisec();
 
 			// std::cout<<"leaf parallel: "<<leaf_parallel<<std::endl;
 			// std::cout<<"simulation cost time: "<<double(finish - begin)/CLOCKS_PER_SEC<<"\n";
@@ -587,7 +595,7 @@ public:
 		}
 	}
 
-	action early(std::shared_ptr<tree_node> node){
+	action early(std::shared_ptr<tree_node> node, double thinking_time=0){
 		int most=0, second=0;
 		action most_a, second_a;
 		int count=0;
@@ -606,8 +614,15 @@ public:
 				}
 			}
 		}
-		if(most - EARLY_T*std::max(1, leaf_parallel) >= second){
-			return most_a;
+		if(earlyc_p==0){
+			if(most - EARLY_T*std::max(1, leaf_parallel) >= second){
+				return most_a;
+			}
+		}
+		else{
+			if(most - thinking_time * simcount_lastturn * earlyc_p * std::max(1, leaf_parallel) >= second){
+				return most_a;
+			}
 		}
 		return action();
 	}
@@ -630,7 +645,7 @@ public:
 
 	virtual action mcts_take_action(const board& state) {
 		clock_t start, end;
-		start = clock();
+		start = millisec();
 		double thinking_time = 0;
 		
 		if(enhanced_peak){
@@ -667,7 +682,7 @@ public:
 		}
 		action most_visited = action();
 		if(if_early){
-			most_visited = early(MCT.get_root());
+			most_visited = early(MCT.get_root(), thinking_time);
 			/* early: if a node has majority votes just choose it */
 			if(most_visited != action()){
 				goto selection_end;
@@ -675,14 +690,15 @@ public:
 		}
 
 		for (int i=0;i<sim_count;i++) {
-			end = clock();
+			end = millisec();
 			double cost = (double)(end - start) / CLOCKS_PER_SEC;
+			// std::cout<<cost<<" : "<<thinking_time<<std::endl;
 			if((cost >= thinking_time) && use_time_management){
 				simcount_lastturn = (double)i / thinking_time;
-				// std::cout<<"leaf parallelization: "<<leaf_parallel<<"\n";
-				// std::cout<<"rollout count: "<<i * std::max(1, leaf_parallel)<<"\n";
-				// std::cout<<"avg count per second: "<<(double)i / thinking_time;
-				// std::cout<<"\n--------------\n\n";
+				std::cout<<"leaf parallelization: "<<leaf_parallel<<"\n";
+				std::cout<<"rollout count: "<<i * std::max(1, leaf_parallel)<<"\n";
+				std::cout<<"avg count per second: "<<(double)i / thinking_time;
+				std::cout<<"\n--------------\n\n";
 				break;
 			}
 			if(MCT.get_root()->check_leaf()){
@@ -692,16 +708,11 @@ public:
 			board after = state;
 			move = selection(after, MCT.get_root()->get_ptr()).first;
 			/* check early multiple times version */
-			// if(if_early && turn > 2){
-			// 	most_visited = early(MCT.get_root());
-			// 	if(most_visited == action())
-			// 		move = selection(after, MCT.get_root()->get_ptr()).first;
-			// 	else{
-			// 		// std::cout<<"early activated"<<std::endl;
-			// 		move = most_visited;
-			// 		break;
-			// 	}
-			// }
+			if(earlyc_p && turn > 2){
+				most_visited = early(MCT.get_root(), thinking_time - cost);
+				if(most_visited != action())
+					break;
+			}
 			// else
 			// 	move = selection(after, MCT.get_root()->get_ptr()).first;
 		}
@@ -712,15 +723,15 @@ public:
 			move = MCT.get_root()->best_children();
 			int unst_N_thisstep = unst_N;
 			while(unst_N_thisstep-- && is_unstable(move)){
-				start2 = clock();
+				start2 = millisec();
 				for (int i=0;i<sim_count;i++) {
-					end = clock();
+					end = millisec();
 					double cost = (double)(end - start2) / CLOCKS_PER_SEC;
 					if((cost >= thinking_time/2) && use_time_management){
 						simcount_lastturn += i;
-						// std::cout<<"rollout count: "<<i * std::max(1, leaf_parallel)<<"\n";
-						// std::cout<<"avg count per second: "<<(double)i / thinking_time;
-						// std::cout<<"\n--------------\n\n";
+						std::cout<<"rollout count: "<<i * std::max(1, leaf_parallel)<<"\n";
+						std::cout<<"avg count per second: "<<(double)i / thinking_time;
+						std::cout<<"\n--------------\n\n";
 						break;
 					}
 					if(MCT.get_root()->check_leaf()){
@@ -748,7 +759,7 @@ public:
 		// std::cout<<"turn "<<turn<<" ended"<<std::endl;
 		if(move.apply(after) == board::legal){
 			last_board = after;
-			end = clock();
+			end = millisec();
 			double cost = (double)(end - start) / CLOCKS_PER_SEC;
 			remaining_time -= cost;
 			return move;
@@ -764,6 +775,12 @@ public:
 			return random_player_take_action(state);
 
 		return action();
+	}
+
+protected:
+	static time_t millisec() {
+		auto now = std::chrono::system_clock::now().time_since_epoch();
+		return std::chrono::duration_cast<std::chrono::milliseconds>(now).count()*1000;
 	}
 
 private:
