@@ -21,6 +21,11 @@
 #include <memory>
 #include <ctime>
 #include <unistd.h>
+#include <thread>
+#include <queue>
+#include <algorithm>
+#include <mutex>
+
 // UCB exploration ratio
 #define C 1.44
 //initial winrate of a unexpanded node in a Monte-Carlo tree
@@ -28,19 +33,21 @@
 //how many simulations have to perform per step
 #define SIM_COUNT 100
 //win value weight
-#define WIN_WEIGHT 5
+#define WIN_WEIGHT 2
 //default basic formula constant for time management
 #define BASIC_C 30
 //default enhanced formula parameter max_ply for time management
-#define ENHANCED_PEAK 30
+#define ENHANCED_PEAK 15
 //initial time limit(ms), less than actual time limit just in case
-#define INIT_TIME 300.0
+#define INIT_TIME 36.0
 //early activate threshold
 #define EARLY_T 5000
 // equally expand thinking time to fully utilize given time if 
 // some time-management use only part of given time
 // set this to 1 to turn-off bonus
 #define TIME_BONUS 1
+
+std::mutex mu;
 
 class agent {
 public:
@@ -98,7 +105,7 @@ class MCTS_agent : public random_agent {
 public:
 	MCTS_agent(const std::string& args = "") : random_agent(args),
 		basic_const(0), enhanced_peak(0), use_time_management(false),
-		 unst_N(0), time_bonus(1){
+		 unst_N(0), time_bonus(1), leaf_parallel(0){
 		if (meta.find("seed") != meta.end())
 			engine.seed(int(meta["seed"]));
 		if (meta.find("C") != meta.end())
@@ -135,6 +142,9 @@ public:
 		if (meta.find("t_bonus") != meta.end())
 			time_bonus = double(meta["t_bonus"]);
 
+		if (meta.find("p_leaf") != meta.end())
+			leaf_parallel = int(meta["p_leaf"]);
+
 		// std::cout<<"search: "<<search<<std::endl;
 	}
 	virtual ~MCTS_agent() {}
@@ -149,6 +159,7 @@ protected:
 	bool use_time_management;
 	int unst_N;
 	double time_bonus;
+	int leaf_parallel;
 	// std::string search;
 };
 
@@ -216,6 +227,9 @@ public:
 		for (size_t i = 0; i < oppo_space.size(); i++)
 			oppo_space[i] = action::place(i, oppo);
 
+		if(leaf_parallel)
+			threads.resize(leaf_parallel);
+
 		MCT = tree(std::make_shared<tree_node>(who, exploration_w), exploration_w);
 	}
 
@@ -251,9 +265,9 @@ public:
 			children[move] = std::make_shared<tree_node>(role, move, expw);
 		}
 
-		void visit_record(int result){
+		void visit_record(int result, int leaf_parallel){
 			wincount += result;
-			visit_count++;
+			visit_count += std::max(1, leaf_parallel);
 		}
 
 		void list_all_children(){
@@ -277,6 +291,7 @@ public:
 				count = iter->second->get_count();
 				if(count >= best_count){
 					// std::cout<<score<<" > "<<best_score<<"\n";
+					// std::cout<<count<<" > "<<best_count<<"\n";
 					best_count = count;
 					best_action = iter->first;
 				}
@@ -286,6 +301,8 @@ public:
 				// 	<< UCB_score(iter->first, role) << "]\n";
         		++iter;
 			}
+			// std::cout << "best action: " << best_action
+			// << "best count" << best_count << "\n";
 			return best_action;
 		}
 
@@ -316,7 +333,7 @@ public:
 			return role;
 		}
 
-		double UCB_score(action::place move, board::piece_type who){
+		double UCB_score(action::place move, board::piece_type who, int leaf_parallel = 0){
 			int c_wincount, c_vcount;
 			if(has_child(move)){
 				std::shared_ptr<tree_node> chld(children[move]->get_ptr());
@@ -331,11 +348,12 @@ public:
 					return 999;
 				else
 					return 0;
-				c_wincount = INIT_WINRATE;
-				c_vcount = 1;
+				c_vcount = std::max(1, leaf_parallel);
+				c_wincount = INIT_WINRATE * c_vcount;
 			}
+			int p = role == who ? 1 : -1;
 			// std::cout<<expw * sqrt(log((double)visit_count)/c_vcount)<<"\n";
-			return (double)c_wincount/c_vcount + expw * sqrt(log((double)visit_count)/c_vcount);
+			return (double)(p * c_wincount)/c_vcount + expw * sqrt(log((double)visit_count)/c_vcount);
 		}
 
 		int get_wincount(){
@@ -352,9 +370,9 @@ public:
 			return is_leaf;
 		}
 
-		void set_wincount(int value){
+		void set_wincount(int value, int leaf_parallel){
 			wincount = value;
-			visit_count++;
+			visit_count += std::max(1, leaf_parallel);
 		}
 		
 	private:
@@ -411,55 +429,41 @@ public:
 		double expw;
 	};
 
-	virtual action random_take_action(const board& state, board::piece_type role) {
-		std::vector<action::place> *auto_space = &space;
-		if(role == oppo){
-			auto_space = &oppo_space;
-		}
+	// virtual action random_take_action(const board& state, std::vector<action::place>& space, board::piece_type role) {
+	// 	std::vector<action::place> *auto_space = &space;
+	// 	if(role == oppo){
+	// 		auto_space = &oppo_space;
+	// 	}
 		
-		for (const action::place& move : *auto_space) {
-			board after = state;
-			if (move.apply(after) == board::legal)
-				return move;
-		}
-		return action();
-	}
+	// 	for (const action::place& move : *auto_space) {
+	// 		board after = state;
+	// 		if (move.apply(after) == board::legal)
+	// 			return move;
+	// 	}
+	// 	return action();
+	// }
 
-	virtual int simulation(const board& state, std::shared_ptr<tree_node> node) {
-		board after = state;
-		board::piece_type role = node->get_role(), op;
-		int reward;
-		if(role == who){
-			reward = 0;
-			op = oppo;
-		}
-		else{
-			reward = 1;
-			op = who;
-		}
-		int count = 0;
-		if(turn%2)
-			std::shuffle(space.begin(), space.end(), engine);
-		else
-			std::shuffle(oppo_space.begin(), oppo_space.end(), engine);
-		while(1){
-			count++;
-			action::place move = random_take_action(after, role);
-			if(move == action()) {
-				return reward*WIN_WEIGHT;
+	int rollout(const board& state) {
+			std::vector<board::point> empty;
+			for (unsigned i = 0; i < 81; i++)
+				if (state(i) == board::empty) empty.push_back(i);
+			
+			std::shuffle(empty.begin(), empty.end(), engine);
+			board rollout = state;
+			for (size_t i = 0, n = empty.size(); n;) {
+				if (rollout.place(empty[n - 1]) == board::legal) {
+					n -= 1;
+					i = 0;
+				} else if (i < n) {
+					std::swap(empty[i++], empty[n - 1]);
+				} else {
+					n = 0;
+				}
 			}
-			else
-				move.apply(after);
-
-			move = random_take_action(after, op);
-			if(move == action()) {
-				// std::cout<<"simulation end as: "<<op<<" total "<<count<<" turns"<<std::endl;
-				// std::cout<<"simulation end as: "<<(role xor 1)<<std::endl;
-				return (reward xor 1)*WIN_WEIGHT;
+			for (size_t i = 0; i < empty.size(); i++) {
+				assert(rollout.place(empty[i]) != board::legal);
 			}
-			else
-				move.apply(after);
-		}
+			return static_cast<board::piece_type>(3 - rollout.info().who_take_turns) == who ? WIN_WEIGHT : 0;
 	}
 
 	virtual std::pair<action, int> selection(const board& state, std::shared_ptr<tree_node> node) {
@@ -469,17 +473,15 @@ public:
 		board best_after;
 		std::vector<action::place> *auto_space = &space;
 
-		int result;
+		int result = 0;
 		if(node->get_role() == oppo)
 			auto_space = &oppo_space;
 		for (const action::place& move : *auto_space) {
 			board after = state;
 			double score;
 			if (move.apply(after) == board::legal){
-				if(node->get_role() == who)
-					score = node->UCB_score(move, who);
-				else
-					score = -node->UCB_score(move, who);
+				score = node->UCB_score(move, who);
+				// std::cout<<score<<std::endl;
 
 				if(score > best_score){
 					best_move = move;
@@ -487,13 +489,14 @@ public:
 					best_after = after;
 				}
 			}
-				
 		}
+		// std::cout<<"----------------------------------\n";
 		if(best_score == -999999){
+			// std::cout<<"what\n";
 			int win = 0;
 			if(node->get_role() == oppo)
-				win = (node->get_count()+1)*WIN_WEIGHT;
-			node->set_wincount(win);
+				win = (node->get_count()+std::max(1,leaf_parallel))*WIN_WEIGHT;
+			node->set_wincount(win, leaf_parallel);
 			node->set_leaf();
 			if(win)win=WIN_WEIGHT;
 			return std::pair<action, int>(action(), win);
@@ -503,21 +506,47 @@ public:
 			std::pair<action, int> back_prop;
 			back_prop = selection(best_after, node->child(best_move));
 			result = back_prop.second;
-			node->visit_record(result);
+			node->visit_record(result, leaf_parallel);
 		}
 		else{
+			clock_t begin, finish;
 			// std::cout<<"expand\n";
 			board::piece_type oppo_role;
 			if(node->get_role() == board::white)
 				oppo_role = board::black;
 			else
 				oppo_role = board::white;
+			begin = clock();
 			node->new_child(oppo_role, best_move);
-			result = simulation(best_after, node->child(best_move)->get_ptr());
+			if(leaf_parallel){
+				// std::cout<<"here;)\n";
+				for (int thread_c = 0; thread_c < leaf_parallel; thread_c++) {
+					// std::cout<<"here;) "<<thread_c<<"\n";
+					// threads[thread_c] = std::thread(&MCTS_player::simulation, this, best_after, node->child(best_move)->get_ptr());
+					threads[thread_c] = std::thread(&MCTS_player::rollout, this, best_after);
+				}
+				// std::cout<<"-----------------\n";
+				for (int thread_c = 0; thread_c < leaf_parallel; thread_c++) {
+					threads[thread_c].join();
+				}
 
-			node->child(best_move)->visit_record(result);
-			node->visit_record(result);
+				while(!simulation_results.empty()){
+					result += simulation_results.front();
+					simulation_results.pop();
+				}
+			}
+			else
+				// result = simulation(best_after, node->child(best_move)->get_ptr());
+				result = rollout(best_after);
+			finish = clock();
 
+			// std::cout<<"leaf parallel: "<<leaf_parallel<<std::endl;
+			// std::cout<<"simulation cost time: "<<double(finish - begin)/CLOCKS_PER_SEC<<"\n";
+			// if(leaf_parallel)
+			// 	std::cout<<"result: "<<result<<"\n";
+
+			node->child(best_move)->visit_record(result, leaf_parallel);
+			node->visit_record(result, leaf_parallel);
 		}
 		return std::pair<action, int>(best_move, result);
 	}
@@ -539,6 +568,8 @@ public:
 			/* can't find opponent's move */
 			/* new game */
 
+			// std::cout<<state<<std::endl;
+			// std::cout<<last_board<<std::endl;
 			std::cout<<"game reset, remain time:"<<remaining_time<<std::endl;
 
 			MCT.reset_tree(who);
@@ -596,6 +627,7 @@ public:
 		clock_t start, end;
 		start = clock();
 		double thinking_time = 0;
+		
 		if(enhanced_peak){
 			thinking_time = remaining_time / (basic_const + std::max(enhanced_peak - turn*2, 0));
 		}
@@ -612,6 +644,7 @@ public:
 		}
 		else{
 			// init
+			// std::cout<<state<<std::endl;
 			std::cout<<"game reset, remain time:"<<remaining_time<<std::endl;
 
 			MCT.reset_tree(who);
@@ -635,11 +668,14 @@ public:
 				goto selection_end;
 			}
 		}
+
 		for (int i=0;i<sim_count;i++) {
 			end = clock();
 			double cost = (double)(end - start) / CLOCKS_PER_SEC;
 			if((cost >= thinking_time) && use_time_management){
-				// std::cout<<"rollout count: "<<i<<"\n";
+				simcount_lastturn = (double)i / thinking_time;
+				// std::cout<<"leaf parallelization: "<<leaf_parallel<<"\n";
+				// std::cout<<"rollout count: "<<i * std::max(1, leaf_parallel)<<"\n";
 				// std::cout<<"avg count per second: "<<(double)i / thinking_time;
 				// std::cout<<"\n--------------\n\n";
 				break;
@@ -651,7 +687,7 @@ public:
 			board after = state;
 			move = selection(after, MCT.get_root()->get_ptr()).first;
 			/* check early multiple times version */
-			// if(i%(sim_count/10)==0){
+			// if(if_early && turn > 2){
 			// 	most_visited = early(MCT.get_root());
 			// 	if(most_visited == action())
 			// 		move = selection(after, MCT.get_root()->get_ptr()).first;
@@ -676,7 +712,8 @@ public:
 					end = clock();
 					double cost = (double)(end - start2) / CLOCKS_PER_SEC;
 					if((cost >= thinking_time/2) && use_time_management){
-						// std::cout<<"rollout count: "<<i<<"\n";
+						simcount_lastturn += i;
+						// std::cout<<"rollout count: "<<i * std::max(1, leaf_parallel)<<"\n";
 						// std::cout<<"avg count per second: "<<(double)i / thinking_time;
 						// std::cout<<"\n--------------\n\n";
 						break;
@@ -693,9 +730,15 @@ public:
 		}
 		else
 			move = MCT.get_root()->best_children();
+			// std::cout<<"----------------------\n";
+
+		if(leaf_parallel)
+			MCT.get_root()->list_all_children();
 		
 		board after = state;
 		MCT.move_root(move);
+
+		// std::cout<<"move: "<<move<<std::endl;
 		
 		// std::cout<<"turn "<<turn<<" ended"<<std::endl;
 		if(move.apply(after) == board::legal){
@@ -728,6 +771,9 @@ private:
 	board last_board;
 	int turn;
 	double remaining_time;
+	std::vector<std::thread> threads;
+	std::queue<int> simulation_results;
+	int simcount_lastturn;
 	// int won;
 	// int lost;
 };
