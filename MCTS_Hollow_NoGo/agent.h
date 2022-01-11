@@ -39,7 +39,7 @@
 //default enhanced formula parameter max_ply for time management
 #define ENHANCED_PEAK 15
 //initial time limit(ms), less than actual time limit just in case
-#define INIT_TIME 36.0
+#define INIT_TIME 300.0
 //early activate threshold
 #define EARLY_T 5000
 // equally expand thinking time to fully utilize given time if 
@@ -605,7 +605,7 @@ public:
 
 			// std::cout<<state<<std::endl;
 			// std::cout<<last_board<<std::endl;
-			std::cout<<"game reset, remain time:"<<remaining_time<<std::endl;
+			// std::cout<<"game reset, remain time:"<<remaining_time<<std::endl;
 
 			MCT.reset_tree(who);
 			turn = 0;
@@ -716,7 +716,7 @@ public:
 		else{
 			// init
 			// std::cout<<state<<std::endl;
-			std::cout<<"game reset, remain time:"<<remaining_time<<std::endl;
+			// std::cout<<"game reset, remain time:"<<remaining_time<<std::endl;
 
 			MCT.reset_tree(who);
 			turn = 0;
