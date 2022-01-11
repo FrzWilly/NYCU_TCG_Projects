@@ -106,7 +106,7 @@ public:
 	MCTS_agent(const std::string& args = "") : random_agent(args),
 		basic_const(0), enhanced_peak(0), use_time_management(false),
 		 unst_N(0), time_bonus(1), leaf_parallel(0), earlyc_p(0),
-		 f_open(0){
+		 f_open(0), behind_threshold(0){
 		if (meta.find("seed") != meta.end())
 			engine.seed(int(meta["seed"]));
 		if (meta.find("C") != meta.end())
@@ -153,6 +153,9 @@ public:
 		if (meta.find("unst") != meta.end())
 			unst_N = int(meta["unst"]);
 
+		if (meta.find("behind") != meta.end())
+			behind_threshold = double(meta["behind"]);
+
 		if (meta.find("t_bonus") != meta.end())
 			time_bonus = double(meta["t_bonus"]);
 
@@ -176,6 +179,7 @@ protected:
 	int leaf_parallel;
 	double earlyc_p;
 	double f_open;
+	double behind_threshold;
 	// std::string search;
 };
 
@@ -651,12 +655,17 @@ public:
 		return (winrate_move != move && move != action());
 	}
 
+	bool check_behind(){
+		auto bestchild = MCT.get_root()->child(MCT.get_root()->best_children());
+		return double(bestchild->get_wincount() / (WIN_WEIGHT* std::max(bestchild->get_count(), 1))) > behind_threshold;
+	}
+
 	int m_expected(int turn, const board& state){
 
 		int exp = (MCT.get_root()->children_count());
 		int heuristic = std::max(33 - turn, 2);;
 		
-		return exp <= 1 ? heuristic : exp;
+		return exp <= 2 ? heuristic : exp;
 		// int empty_count = 0;
 		// for (unsigned i = 0; i < 81; i++)
 		// 	if (state(i) == board::empty)
@@ -678,20 +687,24 @@ public:
 	virtual action mcts_take_action(const board& state) {
 		clock_t start, end;
 		start = millisec();
-		double thinking_time = 0;
-		if(f_open && enhanced_peak){
-			thinking_time = f_open * remaining_time / std::min(m_expected(turn, state), 
-				(basic_const + std::max(enhanced_peak - turn*2, 0)));
+		double thinking_time = 0, time_a=0, time_b=0;
+		// if(f_open && enhanced_peak){
+		// 	thinking_time = f_open * remaining_time / std::min(m_expected(turn, state), 
+		// 		(basic_const + std::max(enhanced_peak - turn*2, 0)));
+		// }
+		if(f_open){
+			time_a = f_open * remaining_time / m_expected(turn, state);
+			thinking_time = time_a;
 		}
-		else if(f_open){
-			thinking_time = f_open * remaining_time / m_expected(turn, state);
-		}
-		else if(enhanced_peak){
-			thinking_time = remaining_time / (basic_const + std::max(enhanced_peak - turn*2, 0));
+		if(enhanced_peak){
+			time_b = remaining_time / (basic_const + std::max(enhanced_peak - turn*2, 0));
+			thinking_time = time_b;
 		}
 		else if(basic_const){
 			thinking_time = remaining_time / basic_const;
 		}
+		if(f_open && enhanced_peak)
+			thinking_time = time_a > time_b ? time_a : time_b;
 		thinking_time *= time_bonus;
 		// std::cout<<"thinking_time this step: "<<thinking_time<<std::endl;
 		action move;
@@ -756,6 +769,29 @@ public:
 		}
 		selection_end:
 		/* unstable time-management method */
+		if(behind_threshold > 0 && check_behind()){
+			clock_t start2;
+			move = MCT.get_root()->best_children();
+			start2 = millisec();
+			for (int i=0;i<sim_count;i++) {
+				end = millisec();
+				double cost = (double)(end - start2) / CLOCKS_PER_SEC;
+				if((cost >= thinking_time/2) && use_time_management){
+					// simcount_lastturn += i;
+					// std::cout<<"rollout count: "<<i * std::max(1, leaf_parallel)<<"\n";
+					// std::cout<<"avg count per second: "<<(double)i / thinking_time;
+					// std::cout<<"\n--------------\n\n";
+					break;
+				}
+				if(MCT.get_root()->check_leaf()){
+					move = action();
+					break;
+				}
+				board after = state;
+				move = selection(after, MCT.get_root()->get_ptr()).first;
+			}
+			move = MCT.get_root()->best_children();
+		}
 		if(unst_N){
 			clock_t start2;
 			move = MCT.get_root()->best_children();
