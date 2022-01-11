@@ -7,8 +7,8 @@ echo "GoGui-TwoGTP Launcher V20211112"
 # P2B='./nogo-judge --shell --name="Judge-Weak-Black" --black="weak"'
 # P2W='./nogo-judge --shell --name="Judge-Weak-White" --white="weak"'
 # commands for remote player 2
-P1B="gogui-client localhost 48763"
-P1W="gogui-client localhost 48763"
+P1B="gogui-client nv14 45678"
+P1W="gogui-client nv14 45678"
 P2B="gogui-client tcglinux10 10002"
 P2W="gogui-client tcglinux10 10002"
 

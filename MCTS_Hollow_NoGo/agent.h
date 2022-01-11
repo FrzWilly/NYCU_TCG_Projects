@@ -480,7 +480,7 @@ public:
 	}
 
 	virtual std::pair<action, int> selection(const board& state, std::shared_ptr<tree_node> node) {
-		//std::cout<<"in selection, "
+		//// std::cout<<"in selection, "
 		action::place best_move;
 		double best_score = -999999;
 		board best_after;
@@ -556,7 +556,7 @@ public:
 			// std::cout<<"leaf parallel: "<<leaf_parallel<<std::endl;
 			// std::cout<<"simulation cost time: "<<double(finish - begin)/CLOCKS_PER_SEC<<"\n";
 			// if(leaf_parallel)
-			// 	std::cout<<"result: "<<result<<"\n";
+			// 	// std::cout<<"result: "<<result<<"\n";
 
 			node->child(best_move)->visit_record(result, leaf_parallel);
 			node->visit_record(result, leaf_parallel);
@@ -583,7 +583,7 @@ public:
 
 			// std::cout<<state<<std::endl;
 			// std::cout<<last_board<<std::endl;
-			std::cout<<"game reset, remain time:"<<remaining_time<<std::endl;
+			// std::cout<<"game reset, remain time:"<<remaining_time<<std::endl;
 
 			MCT.reset_tree(who);
 			turn = 0;
@@ -665,7 +665,7 @@ public:
 		else{
 			// init
 			// std::cout<<state<<std::endl;
-			std::cout<<"game reset, remain time:"<<remaining_time<<std::endl;
+			// std::cout<<"game reset, remain time:"<<remaining_time<<std::endl;
 
 			MCT.reset_tree(who);
 			turn = 0;
@@ -675,9 +675,9 @@ public:
 		// check root role
 		// std::cout<<"root role: "<<MCT.get_root()->get_role()<<std::endl;
 		if(MCT.get_root()->get_role() != who){
-			std::cout<<"wrong role at root"<<std::endl;
-			std::cout<<"\n\ncurrent board:\n";
-			std::cout<<state<<std::endl;
+			// std::cout<<"wrong role at root"<<std::endl;
+			// std::cout<<"\n\ncurrent board:\n";
+			// std::cout<<state<<std::endl;
 			exit(-1);
 		}
 		action most_visited = action();
@@ -695,10 +695,10 @@ public:
 			// std::cout<<cost<<" : "<<thinking_time<<std::endl;
 			if((cost >= thinking_time) && use_time_management){
 				simcount_lastturn = (double)i / thinking_time;
-				std::cout<<"leaf parallelization: "<<leaf_parallel<<"\n";
-				std::cout<<"rollout count: "<<i * std::max(1, leaf_parallel)<<"\n";
-				std::cout<<"avg count per second: "<<(double)i / thinking_time;
-				std::cout<<"\n--------------\n\n";
+				// std::cout<<"leaf parallelization: "<<leaf_parallel<<"\n";
+				// std::cout<<"rollout count: "<<i * std::max(1, leaf_parallel)<<"\n";
+				// std::cout<<"avg count per second: "<<(double)i / thinking_time;
+				// std::cout<<"\n--------------\n\n";
 				break;
 			}
 			if(MCT.get_root()->check_leaf()){
@@ -729,9 +729,9 @@ public:
 					double cost = (double)(end - start2) / CLOCKS_PER_SEC;
 					if((cost >= thinking_time/2) && use_time_management){
 						simcount_lastturn += i;
-						std::cout<<"rollout count: "<<i * std::max(1, leaf_parallel)<<"\n";
-						std::cout<<"avg count per second: "<<(double)i / thinking_time;
-						std::cout<<"\n--------------\n\n";
+						// std::cout<<"rollout count: "<<i * std::max(1, leaf_parallel)<<"\n";
+						// std::cout<<"avg count per second: "<<(double)i / thinking_time;
+						// std::cout<<"\n--------------\n\n";
 						break;
 					}
 					if(MCT.get_root()->check_leaf()){
