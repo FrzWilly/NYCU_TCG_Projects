@@ -463,7 +463,12 @@ public:
 			for (size_t i = 0; i < empty.size(); i++) {
 				assert(rollout.place(empty[i]) != board::legal);
 			}
-			return static_cast<board::piece_type>(3 - rollout.info().who_take_turns) == who ? WIN_WEIGHT : 0;
+			int outcome = static_cast<board::piece_type>(3 - rollout.info().who_take_turns) == who ? WIN_WEIGHT : 0;
+			mu.lock();
+			if(leaf_parallel)
+				simulation_results.push(outcome);
+			mu.unlock();
+			return outcome;
 	}
 
 	virtual std::pair<action, int> selection(const board& state, std::shared_ptr<tree_node> node) {
@@ -601,7 +606,7 @@ public:
 				}
 			}
 		}
-		if(most - EARLY_T >= second){
+		if(most - EARLY_T*std::max(1, leaf_parallel) >= second){
 			return most_a;
 		}
 		return action();
@@ -732,8 +737,8 @@ public:
 			move = MCT.get_root()->best_children();
 			// std::cout<<"----------------------\n";
 
-		if(leaf_parallel)
-			MCT.get_root()->list_all_children();
+		// if(leaf_parallel)
+		// 	MCT.get_root()->list_all_children();
 		
 		board after = state;
 		MCT.move_root(move);
