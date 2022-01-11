@@ -39,7 +39,7 @@
 //default enhanced formula parameter max_ply for time management
 #define ENHANCED_PEAK 15
 //initial time limit(ms), less than actual time limit just in case
-#define INIT_TIME 36.0
+#define INIT_TIME 300.0
 //early activate threshold
 #define EARLY_T 5000
 // equally expand thinking time to fully utilize given time if 
@@ -468,9 +468,9 @@ public:
 					n = 0;
 				}
 			}
-			for (size_t i = 0; i < empty.size(); i++) {
-				assert(rollout.place(empty[i]) != board::legal);
-			}
+			// for (size_t i = 0; i < empty.size(); i++) {
+			// 	assert(rollout.place(empty[i]) != board::legal);
+			// }
 			int outcome = static_cast<board::piece_type>(3 - rollout.info().who_take_turns) == who ? WIN_WEIGHT : 0;
 			mu.lock();
 			if(leaf_parallel)
@@ -522,14 +522,14 @@ public:
 			node->visit_record(result, leaf_parallel);
 		}
 		else{
-			clock_t begin, finish;
+			// clock_t begin, finish;
 			// std::cout<<"expand\n";
 			board::piece_type oppo_role;
 			if(node->get_role() == board::white)
 				oppo_role = board::black;
 			else
 				oppo_role = board::white;
-			begin = millisec();
+			// begin = millisec();
 			node->new_child(oppo_role, best_move);
 			if(leaf_parallel){
 				// std::cout<<"here;)\n";
@@ -551,7 +551,7 @@ public:
 			else
 				// result = simulation(best_after, node->child(best_move)->get_ptr());
 				result = rollout(best_after);
-			finish = millisec();
+			// finish = millisec();
 
 			// std::cout<<"leaf parallel: "<<leaf_parallel<<std::endl;
 			// std::cout<<"simulation cost time: "<<double(finish - begin)/CLOCKS_PER_SEC<<"\n";
